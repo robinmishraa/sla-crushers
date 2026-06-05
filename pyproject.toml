@@ -1,0 +1,40 @@
+[project]
+name = "sla-crushers"
+version = "0.1.0"
+description = "AI agent that turns a Slack dogfooding link into a full RCA + (optionally) a draft PR."
+authors = [{ name = "GobbleCube Hackathon" }]
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.5.3",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.2",
+    "httpx>=0.27.0",
+    "anthropic>=0.40.0",
+    "slack-sdk>=3.33.0",
+    "slack-bolt>=1.21.0",
+    "pygithub>=2.4.0",
+    "sqlalchemy>=2.0.25",
+    "snowflake-connector-python==4.4.0",
+    "psycopg2-binary>=2.9.9",
+    "cryptography>=43.0.0",
+    "boto3>=1.34.15",
+    "sse-starlette>=2.1.3",
+    "temporalio>=1.14.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ipython>=8.19.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rca_agent"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"

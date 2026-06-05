@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>sla-crushers — RCA Agent</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0b0f17;
+        --panel: #121826;
+        --panel-2: #161d2e;
+        --border: #1e2740;
+        --text: #e6edf3;
+        --muted: #8b97aa;
+        --accent: #7aa2f7;
+        --good: #98c379;
+        --bad: #e06c75;
+        --warn: #e5c07b;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+          Arial, sans-serif; font-size: 14px; line-height: 1.5; height: 100%; }
+      header {
+        padding: 14px 20px; border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 12px;
+        background: linear-gradient(180deg, #0f1525 0%, #0b0f17 100%);
+      }
+      header .logo { font-weight: 700; letter-spacing: 0.2px; font-size: 16px; }
+      header .badge {
+        font-size: 11px; padding: 2px 8px; border-radius: 9999px;
+        background: #1f2a44; color: var(--accent); border: 1px solid #2a3760;
+      }
+      header .spacer { flex: 1; }
+      main {
+        display: grid; grid-template-columns: 380px 1fr; gap: 0;
+        height: calc(100vh - 53px); min-height: 0;
+      }
+      .left {
+        border-right: 1px solid var(--border);
+        padding: 16px; overflow-y: auto; background: var(--panel);
+      }
+      .right {
+        padding: 16px; overflow-y: auto;
+      }
+      label.stack { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      input[type="text"], textarea {
+        width: 100%; background: var(--panel-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px 12px; font-family: inherit; font-size: 14px;
+      }
+      input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--accent); }
+      button {
+        background: var(--accent); color: #0b0f17; border: none;
+        border-radius: 8px; padding: 10px 14px; font-weight: 600;
+        cursor: pointer; font-size: 13px;
+      }
+      button.secondary {
+        background: transparent; border: 1px solid var(--border); color: var(--text);
+      }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--panel-2); border: 1px solid var(--border);
+        padding: 4px 10px; border-radius: 9999px; font-size: 12px; color: var(--muted);
+      }
+      .pill.good { color: var(--good); border-color: #2a4a2a; }
+      .pill.bad { color: var(--bad); border-color: #4a2a2a; }
+      .pill.warn { color: var(--warn); }
+      .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); margin: 16px 0 8px; }
+      .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px; background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 8px; padding: 10px; max-height: 360px; overflow-y: auto;
+        white-space: pre-wrap; word-break: break-word; }
+      .log .line { padding: 1px 0; }
+      .log .line.start { color: var(--accent); }
+      .log .line.ok { color: var(--good); }
+      .log .line.err { color: var(--bad); }
+      .log .line.muted { color: var(--muted); }
+      .card { background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+      .card h3 { margin: 0 0 8px; font-size: 14px; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+      .conf-bar { background: var(--bg); border-radius: 8px; height: 6px; overflow: hidden; }
+      .conf-bar > span { display: block; height: 100%; background: var(--accent); }
+      details { background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+      details > summary { cursor: pointer; font-weight: 600; }
+      .tag { display: inline-block; padding: 2px 8px; border-radius: 4px;
+        font-size: 11px; background: var(--panel); border: 1px solid var(--border);
+        color: var(--muted); margin-right: 4px; }
+      .tag.passed { color: var(--good); border-color: #2a4a2a; }
+      .tag.failed { color: var(--bad); border-color: #4a2a2a; }
+      .tag.inconclusive { color: var(--warn); }
+      .tag.skipped, .tag.not_run { color: var(--muted); }
+      .empty {
+        color: var(--muted); text-align: center; padding: 60px 20px;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code { background: #0b0f17; padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">sla-crushers</div>
+      <div class="badge">RCA Agent</div>
+      <div class="spacer"></div>
+      <div id="status" class="pill">idle</div>
+    </header>
+    <main>
+      <aside class="left">
+        <label class="stack" for="slack-url">Slack message link</label>
+        <input id="slack-url" type="text"
+          placeholder="https://workspace.slack.com/archives/C…/p…" />
+        <div class="row" style="margin-top: 10px;">
+          <button id="run-btn">Run RCA</button>
+          <button id="reset-btn" class="secondary" type="button">Reset</button>
+        </div>
+
+        <div class="section-title">Live tool calls</div>
+        <div id="log" class="log"></div>
+
+        <div class="section-title">Run id</div>
+        <div id="run-id" class="pill" style="font-family: ui-monospace, monospace;">—</div>
+      </aside>
+
+      <section class="right" id="report">
+        <div class="empty">
+          Paste a Slack <code>#dogfooding</code> message link on the left and hit
+          <strong>Run RCA</strong>. The agent will fetch the thread, classify the issue,
+          investigate Snowflake / Postgres / spider source / git history, and post
+          a structured RCA back here.
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (sel) => document.querySelector(sel);
+      const log = $("#log");
+      const report = $("#report");
+      const status = $("#status");
+
+      function appendLog(text, cls = "") {
+        const div = document.createElement("div");
+        div.className = "line " + cls;
+        div.textContent = text;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      function clearLog() {
+        log.innerHTML = "";
+        report.innerHTML = '<div class="empty">Investigation in progress…</div>';
+      }
+
+      function setStatus(text, cls = "") {
+        status.textContent = text;
+        status.className = "pill " + cls;
+      }
+
+      function fmtArgs(args) {
+        try {
+          const s = JSON.stringify(args || {});
+          return s.length > 220 ? s.slice(0, 220) + "…" : s;
+        } catch (_) { return ""; }
+      }
+
+      function renderRca(rca) {
+        const top = (rca.hypotheses || [])
+          .filter(h => h.status === "supported")
+          .sort((a, b) => b.confidence - a.confidence)[0];
+        const ruled = (rca.hypotheses || []).filter(h => h.status === "ruled_out");
+
+        const evMap = {};
+        (rca.evidence || []).forEach(e => evMap[e.id] = e);
+
+        let html = "";
+        html += `
+          <div class="card">
+            <div class="row" style="justify-content: space-between;">
+              <div>
+                <div class="section-title" style="margin-top: 0;">Summary</div>
+                <h3 style="margin: 0;">${escape(rca.summary || "(no summary)")}</h3>
+              </div>
+              <div class="row">
+                ${rca.target_platform
+                    ? `<span class="pill">${escape(rca.target_platform)}</span>` : ""}
+                ${rca.target_module
+                    ? `<span class="pill">${escape(rca.target_module)}</span>` : ""}
+              </div>
+            </div>
+          </div>`;
+
+        if (top) {
+          html += `
+            <div class="card">
+              <div class="section-title" style="margin-top: 0;">Top hypothesis</div>
+              <h3>${escape(top.title)}</h3>
+              <div class="row" style="gap: 12px; margin: 6px 0 10px;">
+                <span class="pill">${escape(top.category)}</span>
+                <div style="flex: 1;">
+                  <div class="conf-bar">
+                    <span style="width: ${Math.round(top.confidence * 100)}%"></span>
+                  </div>
+                </div>
+                <span class="pill">${(top.confidence * 100).toFixed(0)}% confidence</span>
+              </div>
+              <div>${escape(top.explanation)}</div>
+              <div style="margin-top: 8px;">
+                ${(top.evidence_ids || []).map(eid =>
+                    `<span class="tag" title="${escape((evMap[eid] || {}).summary || '')}">${eid}</span>`).join("")}
+              </div>
+            </div>`;
+        }
+
+        if ((rca.chain_of_custody || []).length) {
+          html += `<div class="card">
+            <div class="section-title" style="margin-top: 0;">Chain of custody</div>
+            <table><thead><tr><th>Layer</th><th>Expected</th><th>Observed</th><th>Healthy</th></tr></thead><tbody>`;
+          rca.chain_of_custody.forEach(h => {
+            html += `<tr>
+              <td><code>${escape(h.layer)}</code></td>
+              <td>${escape(h.expected)}</td>
+              <td>${escape(h.observed)}</td>
+              <td>${h.healthy ? "✅" : "❌"}</td>
+            </tr>`;
+          });
+          html += "</tbody></table></div>";
+        }
+
+        if ((rca.investigation_checklist || []).length) {
+          html += `<details open><summary>Investigation checklist
+              (${rca.investigation_checklist.length} checks)</summary>
+            <table style="margin-top: 10px;">
+              <thead><tr><th>Check</th><th>Status</th><th>Finding</th></tr></thead><tbody>`;
+          rca.investigation_checklist.forEach(c => {
+            html += `<tr>
+              <td>${escape(c.label)}</td>
+              <td><span class="tag ${c.status}">${c.status}</span></td>
+              <td>${escape(c.finding || "")}</td>
+            </tr>`;
+          });
+          html += "</tbody></table></details>";
+        }
+
+        if (ruled.length) {
+          html += `<details><summary>Ruled out (${ruled.length})</summary>
+            <table style="margin-top: 10px;">
+              <thead><tr><th>Hypothesis</th><th>Why dismissed</th></tr></thead><tbody>`;
+          ruled.forEach(h => {
+            html += `<tr><td>${escape(h.title)}</td>
+              <td>${escape(h.rule_out_reason || "—")}</td></tr>`;
+          });
+          html += "</tbody></table></details>";
+        }
+
+        if ((rca.evidence || []).length) {
+          html += `<details><summary>Evidence (${rca.evidence.length})</summary>
+            <table style="margin-top: 10px;">
+              <thead><tr><th>Id</th><th>Kind</th><th>Summary</th><th>Where</th></tr></thead><tbody>`;
+          rca.evidence.forEach(e => {
+            html += `<tr>
+              <td><code>${escape(e.id)}</code></td>
+              <td>${escape(e.kind)}</td>
+              <td>${escape(e.summary)}</td>
+              <td>${escape(e.location || "")}</td>
+            </tr>`;
+          });
+          html += "</tbody></table></details>";
+        }
+
+        if (rca.fix && rca.fix.kind && rca.fix.kind !== "none") {
+          html += `<div class="card">
+            <div class="section-title" style="margin-top: 0;">Proposed fix</div>
+            <h3>${escape(rca.fix.kind)} (${(rca.fix.confidence * 100).toFixed(0)}% confidence)</h3>
+            <div style="margin-bottom: 8px;">${escape(rca.fix.rationale || "")}</div>
+            ${rca.pr_url
+              ? `<a href="${escape(rca.pr_url)}" target="_blank">→ Draft PR ${escape(rca.pr_url)}</a>`
+              : `<pre style="background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto;"><code>${escape(rca.fix.diff || "")}</code></pre>`}
+          </div>`;
+        }
+
+        report.innerHTML = html;
+      }
+
+      function escape(s) {
+        return String(s == null ? "" : s)
+          .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+      }
+
+      $("#run-btn").addEventListener("click", () => {
+        const url = $("#slack-url").value.trim();
+        if (!url) { alert("Paste a Slack message link first."); return; }
+        clearLog();
+        setStatus("running", "warn");
+        appendLog("→ starting investigation", "start");
+
+        const es = new EventSource(
+          "/rca/stream?slack_url=" + encodeURIComponent(url));
+
+        es.addEventListener("status", (e) => {
+          const d = JSON.parse(e.data);
+          appendLog("• " + (d.payload && d.payload.message ? d.payload.message : "—"),
+            "muted");
+          $("#run-id").textContent = d.run_id || "—";
+        });
+        es.addEventListener("issue_extracted", (e) => {
+          const d = JSON.parse(e.data);
+          const i = d.payload.issue || {};
+          appendLog(`✓ issue: ${i.platform || "?"} / ${i.module || "?"} — ${i.intent || "other"}`,
+            "ok");
+        });
+        es.addEventListener("tool_call_started", (e) => {
+          const d = JSON.parse(e.data);
+          appendLog(`→ ${d.payload.tool}  ${fmtArgs(d.payload.args)}`, "start");
+        });
+        es.addEventListener("tool_call_finished", (e) => {
+          const d = JSON.parse(e.data);
+          const ok = d.payload.ok ? "ok" : "err";
+          const rows = d.payload.rows != null ? `(${d.payload.rows} rows)` : "";
+          appendLog(`${d.payload.ok ? "✓" : "✗"} ${d.payload.tool} ${rows}`, ok);
+        });
+        es.addEventListener("rca_complete", (e) => {
+          const d = JSON.parse(e.data);
+          renderRca(d.payload.rca);
+          setStatus("complete", "good");
+          appendLog("✓ RCA complete", "ok");
+          es.close();
+        });
+        es.addEventListener("error", (e) => {
+          try {
+            const d = JSON.parse(e.data || "{}");
+            appendLog("✗ " + (d.payload && d.payload.error ? d.payload.error : "error"),
+              "err");
+          } catch (_) {
+            appendLog("✗ stream error", "err");
+          }
+          setStatus("error", "bad");
+          es.close();
+        });
+        es.addEventListener("end", () => {
+          es.close();
+        });
+      });
+
+      $("#reset-btn").addEventListener("click", () => {
+        $("#slack-url").value = "";
+        clearLog();
+        report.innerHTML = '<div class="empty">Ready.</div>';
+        setStatus("idle");
+        $("#run-id").textContent = "—";
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,270 @@
+"""Pydantic schemas for the RCA agent.
+
+These are the single source of truth for the contract between
+the LLM, the orchestrator, the tools, and the UI.
+
+Design notes:
+- Every Hypothesis MUST cite Evidence ids — no hand-wavy RCAs.
+- Every Evidence row carries the exact tool call that produced it,
+  so a reviewer can re-run it from the audit log.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+# ---------- Issue extraction ----------
+
+class IssueIntent(str, Enum):
+    MISSING_DATA = "missing_data"          # rows expected, none/few present
+    STALE_DATA = "stale_data"              # last update too old
+    WRONG_VALUE = "wrong_value"            # price/title/stock looks wrong
+    EMPTY_RESPONSE = "empty_response"      # spider scraping but yielding 0
+    BLOCKED = "blocked"                    # 403/429/captcha/WAF
+    SCHEMA_MISMATCH = "schema_mismatch"    # field renamed/removed upstream
+    LOCATION_MISMATCH = "location_mismatch"  # wrong pincode/pluscode
+    PARTIAL_FAILURE = "partial_failure"    # some items succeed, some don't
+    OTHER = "other"
+
+
+class TimeWindow(BaseModel):
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    natural: Optional[str] = Field(
+        default=None,
+        description="Original natural-language phrase (e.g. 'yesterday', 'last 3 hrs').",
+    )
+
+
+class Issue(BaseModel):
+    """Structured representation of what the user is complaining about."""
+    raw_summary: str = Field(..., description="One-line human description.")
+    platform: Optional[str] = Field(default=None, description="Maps to Platform enum.")
+    module: Optional[str] = Field(default=None, description="search | pdp | brand | product_listing")
+    country: Optional[str] = Field(default=None, description="ISO-2 if known (IN, AE, SA, MX, TR, BH).")
+    city_or_pincode: Optional[str] = None
+    identifiers: list[str] = Field(
+        default_factory=list,
+        description="ASINs / keywords / product slugs / SKU ids mentioned in the ticket.",
+    )
+    intent: IssueIntent = IssueIntent.OTHER
+    time_window: TimeWindow = Field(default_factory=TimeWindow)
+    ticket_url: Optional[str] = None
+    slack_channel: Optional[str] = None
+    slack_ts: Optional[str] = None
+    slack_thread_ts: Optional[str] = None
+
+
+# ---------- Tool calls + Evidence ----------
+
+class ToolName(str, Enum):
+    SLACK_GET_THREAD = "slack.get_thread"
+    SLACK_POST_REPLY = "slack.post_reply"
+    CLICKUP_GET_TICKET = "clickup.get_ticket"
+    SF_QUERY = "snowflake.query"
+    SF_LIST_TABLES = "snowflake.list_tables"
+    SF_DESCRIBE = "snowflake.describe"
+    PG_QUERY = "postgres.query"
+    PG_LIST_TABLES = "postgres.list_tables"
+    PG_DESCRIBE = "postgres.describe"
+    REPO_SEARCH = "repo.search"
+    REPO_READ = "repo.read"
+    REGISTRY_RESOLVE = "registry.resolve"
+    TEMPORAL_HISTORY = "temporal.history"
+    S3_LIST = "s3.list"
+    S3_READ = "s3.read"
+    GIT_LOG = "git.log"
+    GIT_SHOW = "git.show"
+    GIT_BLAME = "git.blame"
+    GITHUB_LIST_PRS = "github.list_prs"
+    GITHUB_GET_PR = "github.get_pr"
+    GITHUB_OPEN_PR = "github.open_pr"
+
+
+class ToolCall(BaseModel):
+    """A single recorded tool invocation."""
+    id: str
+    tool: ToolName
+    args: dict[str, Any] = Field(default_factory=dict)
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    ok: bool = True
+    error: Optional[str] = None
+    result_preview: Optional[str] = Field(
+        default=None,
+        description="First ~2KB of the result, for the audit trail.",
+    )
+    rows: Optional[int] = Field(default=None, description="Row count for SQL tools.")
+
+
+class EvidenceKind(str, Enum):
+    SQL_RESULT = "sql_result"
+    CODE_REFERENCE = "code_reference"
+    REGISTRY_ENTRY = "registry_entry"
+    SLACK_MESSAGE = "slack_message"
+    CLICKUP_TICKET = "clickup_ticket"
+    TEMPORAL_HISTORY = "temporal_history"
+    S3_ARTIFACT = "s3_artifact"
+    GIT_COMMIT = "git_commit"
+    GITHUB_PR = "github_pr"
+
+
+class Evidence(BaseModel):
+    """A single fact the agent collected, anchored to a tool call."""
+    id: str = Field(..., description="Stable id for hypothesis citations, e.g. 'E1'.")
+    kind: EvidenceKind
+    summary: str = Field(..., description="One-line human-readable claim.")
+    tool_call_id: str = Field(..., description="ID of the ToolCall that produced this.")
+    detail: dict[str, Any] = Field(default_factory=dict)
+    location: Optional[str] = Field(
+        default=None,
+        description="path:line for code, table for sql, url for slack/clickup, etc.",
+    )
+
+
+# ---------- Hypothesis + RCA ----------
+
+class HypothesisStatus(str, Enum):
+    SUPPORTED = "supported"
+    RULED_OUT = "ruled_out"
+    UNVERIFIED = "unverified"
+
+
+class Hypothesis(BaseModel):
+    title: str
+    explanation: str = Field(..., description="Plain English root cause.")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    status: HypothesisStatus = HypothesisStatus.UNVERIFIED
+    evidence_ids: list[str] = Field(default_factory=list)
+    rule_out_reason: Optional[str] = Field(
+        default=None,
+        description="Required when status == RULED_OUT; explains which evidence killed it.",
+    )
+    category: Literal[
+        "selector_drift",
+        "header_or_cookie",
+        "pincode_or_location",
+        "url_pattern",
+        "upstream_schema_change",
+        "rate_limit_or_block",
+        "infra_or_pipeline",
+        "data_pipeline_lag",
+        "input_data_issue",
+        "code_regression",
+        "config_change",
+        "other",
+    ] = "other"
+
+
+class ChecklistStatus(str, Enum):
+    PASSED = "passed"        # check ran, result was healthy
+    FAILED = "failed"        # check ran, result was unhealthy (this is a positive finding)
+    INCONCLUSIVE = "inconclusive"
+    SKIPPED = "skipped"      # not applicable to this issue type
+    NOT_RUN = "not_run"
+
+
+class ChecklistItem(BaseModel):
+    """One concrete thing the agent verified.
+
+    The list of checks below IS the 'I checked every damn thing' deliverable.
+    A demo-quality RCA includes ~15-20 of these, not 3.
+    """
+    key: str = Field(..., description="Stable id, e.g. 'sf_recent_rows'.")
+    label: str = Field(..., description="Human-readable name of the check.")
+    status: ChecklistStatus
+    finding: str = Field(default="", description="One-line result of the check.")
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ChainOfCustodyHop(BaseModel):
+    """Tracks data through the pipeline: spider -> S3 -> Postgres -> Snowflake."""
+    layer: Literal["temporal_run", "s3_raw", "postgres", "snowflake", "report"]
+    expected: str = Field(..., description="What we expected at this layer.")
+    observed: str = Field(..., description="What we actually saw.")
+    healthy: bool
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class FixProposalKind(str, Enum):
+    SELECTOR_UPDATE = "selector_update"
+    HEADER_UPDATE = "header_update"
+    PINCODE_UPDATE = "pincode_update"
+    URL_PATTERN_UPDATE = "url_pattern_update"
+    NONE = "none"
+
+
+class FixProposal(BaseModel):
+    kind: FixProposalKind = FixProposalKind.NONE
+    rationale: str = ""
+    file_path: Optional[str] = None
+    diff: Optional[str] = Field(
+        default=None,
+        description="Unified diff that the recipe will apply. None if NONE.",
+    )
+    confidence: float = 0.0
+
+
+class RcaReport(BaseModel):
+    issue: Issue
+    target_platform: Optional[str] = None
+    target_module: Optional[str] = None
+    target_runner: Optional[str] = Field(
+        default=None, description="Module path of the runner config (e.g. runners.blinkit.search)."
+    )
+    summary: str = Field(..., description="2-3 sentence executive summary.")
+    evidence: list[Evidence] = Field(default_factory=list)
+    chain_of_custody: list[ChainOfCustodyHop] = Field(
+        default_factory=list,
+        description="End-to-end pipeline walk: temporal -> s3 -> postgres -> snowflake -> report.",
+    )
+    investigation_checklist: list[ChecklistItem] = Field(
+        default_factory=list,
+        description="Every concrete check the agent performed. This is the 'I checked everything' artifact.",
+    )
+    hypotheses: list[Hypothesis] = Field(
+        default_factory=list,
+        description="ALL hypotheses considered. Status field marks supported vs ruled_out.",
+    )
+    fix: FixProposal = Field(default_factory=FixProposal)
+    pr_url: Optional[str] = None
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    run_id: str
+
+    @property
+    def top_hypothesis(self) -> Optional[Hypothesis]:
+        supported = [h for h in self.hypotheses if h.status == HypothesisStatus.SUPPORTED]
+        if not supported:
+            return None
+        return max(supported, key=lambda h: h.confidence)
+
+    @property
+    def ruled_out(self) -> list[Hypothesis]:
+        return [h for h in self.hypotheses if h.status == HypothesisStatus.RULED_OUT]
+
+
+# ---------- Streaming events for the UI ----------
+
+class StreamEvent(BaseModel):
+    """Server-sent event payload."""
+    type: Literal[
+        "status",
+        "issue_extracted",
+        "tool_call_started",
+        "tool_call_finished",
+        "evidence_added",
+        "hypothesis",
+        "fix_proposed",
+        "pr_opened",
+        "rca_complete",
+        "error",
+    ]
+    run_id: str
+    timestamp: datetime
+    payload: dict[str, Any] = Field(default_factory=dict)
