@@ -30,9 +30,12 @@ from rca_agent.core.schemas import (
     FixProposal,
     FixProposalKind,
     Hypothesis,
+    InvestigationPlanItem,
     Issue,
+    NextAction,
     RcaReport,
     StreamEvent,
+    VerdictKind,
 )
 from rca_agent.core.settings import settings
 from rca_agent.core.slack_blocks import build_blocks, fallback_text
@@ -54,7 +57,66 @@ _SUBMIT_RCA_SCHEMA: dict[str, Any] = {
     "input_schema": {
         "type": "object",
         "properties": {
-            "summary": {"type": "string"},
+            "summary": {
+                "type": "string",
+                "description": "Primary executive summary (technical). If summary_technical is also provided, this can mirror it.",
+            },
+            "summary_business": {
+                "type": "string",
+                "description": "Plain-English summary for non-technical readers (1-2 sentences, no jargon).",
+            },
+            "summary_technical": {
+                "type": "string",
+                "description": "Technical summary for engineers (2-4 sentences, cites tool call ids and identifiers).",
+            },
+            "verdict_kind": {
+                "type": "string",
+                "enum": ["root_cause_found", "needs_ui_verification", "needs_deeper_probe", "inconclusive"],
+                "description": "What kind of conclusion you reached — drives the UI banner.",
+            },
+            "next_actions": {
+                "type": "array",
+                "description": "Concrete things a human can/should do next. Include at least one unless verdict_kind=root_cause_found AND a fix PR was opened.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "enum": ["human_verify_ui", "run_deep_probe", "review_pr", "manual_fix", "info"],
+                        },
+                        "title": {"type": "string"},
+                        "detail": {"type": "string"},
+                        "audience": {"type": "string", "enum": ["business", "technical", "both"]},
+                        "suggested_tool": {
+                            "type": "string",
+                            "description": "If kind=run_deep_probe: the tool name (e.g. 's3.read', 'snowflake.query').",
+                        },
+                        "suggested_args": {
+                            "type": "object",
+                            "description": "Pre-baked args for the suggested tool.",
+                        },
+                    },
+                    "required": ["kind", "title"],
+                },
+            },
+            "investigation_plan": {
+                "type": "array",
+                "description": "Your triage decisions: which layers you chose to check and which you skipped (and why).",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "layer": {
+                            "type": "string",
+                            "enum": ["registry", "snowflake", "postgres", "s3", "temporal",
+                                     "spider_code", "git_history", "github_prs", "other"],
+                        },
+                        "description": {"type": "string"},
+                        "will_check": {"type": "boolean"},
+                        "reason": {"type": "string"},
+                    },
+                    "required": ["layer", "description"],
+                },
+            },
             "target_platform": {"type": "string"},
             "target_module": {"type": "string"},
             "target_runner": {"type": "string"},
@@ -397,17 +459,36 @@ def run_rca(slack_url: str) -> Iterator[StreamEvent]:
             checklist = [ChecklistItem(**c) for c in rca_payload.get("investigation_checklist", [])]
             chain = [ChainOfCustodyHop(**h) for h in rca_payload.get("chain_of_custody", [])]
             fix = FixProposal(**rca_payload.get("fix") or {})
+            next_actions = [NextAction(**a) for a in rca_payload.get("next_actions", [])]
+            plan = [InvestigationPlanItem(**p) for p in rca_payload.get("investigation_plan", [])]
         except ValidationError as e:
             yield _evt("error", run_id, error=f"submit_rca payload invalid: {e}")
             audit.finish_run(run_id, "failed")
             return
+
+        # Verdict — fall back to inconclusive if the LLM forgets it
+        verdict_raw = rca_payload.get("verdict_kind") or VerdictKind.INCONCLUSIVE.value
+        try:
+            verdict = VerdictKind(verdict_raw)
+        except ValueError:
+            verdict = VerdictKind.INCONCLUSIVE
+
+        # Make sure both summary fields end up populated (back-compat: `summary` mirrors technical)
+        summary_tech = rca_payload.get("summary_technical") or rca_payload.get("summary") or ""
+        summary_biz = rca_payload.get("summary_business") or ""
+        summary = rca_payload.get("summary") or summary_tech
 
         report = RcaReport(
             issue=issue,
             target_platform=rca_payload.get("target_platform") or issue.platform,
             target_module=rca_payload.get("target_module") or issue.module,
             target_runner=rca_payload.get("target_runner"),
-            summary=rca_payload.get("summary", ""),
+            summary=summary,
+            summary_technical=summary_tech,
+            summary_business=summary_biz,
+            verdict_kind=verdict,
+            next_actions=next_actions,
+            investigation_plan=plan,
             evidence=evidence,
             chain_of_custody=chain,
             investigation_checklist=checklist,

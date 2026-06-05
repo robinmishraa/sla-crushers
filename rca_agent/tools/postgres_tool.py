@@ -57,7 +57,17 @@ def _maybe_inject_limit(sql: str, default_limit: int) -> str:
 
 
 def _get_engine():
-    from common.config import database  # noqa: WPS433
+    try:
+        settings().require_scraping_repo()
+    except RuntimeError as e:
+        raise ToolError(str(e)) from e
+    try:
+        from common.config import database  # noqa: WPS433
+    except ImportError as e:
+        raise ToolError(
+            "Could not import common.config.database from the scraping repo. "
+            f"Underlying error: {e}"
+        ) from e
     if database.engine is None:
         raise ToolError("Postgres engine is not configured (DB_HOST not set).")
     return database.engine

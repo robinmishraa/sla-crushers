@@ -35,6 +35,12 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["rca_agent"]
 
+# Tell Poetry we only use it for dependency management, not to install this
+# project itself. Avoids the "No file/folder found for package sla-crushers"
+# warning (the actual import package is `rca_agent`, not `sla-crushers`).
+[tool.poetry]
+package-mode = false
+
 [tool.ruff]
 line-length = 130
 target-version = "py311"

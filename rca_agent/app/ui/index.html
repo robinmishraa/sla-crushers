@@ -1,150 +1,927 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <title>sla-crushers — RCA Agent</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+      /* =====================================================================
+         THEME — light + dark with a toggle
+         ===================================================================== */
+      :root, [data-theme="light"] {
+        --bg:            #f6f7fb;
+        --bg-grad-a:     #eef2ff;
+        --bg-grad-b:     #fdf4ff;
+        --bg-grad-c:     #ecfeff;
+        --panel:         rgba(255, 255, 255, 0.72);
+        --panel-solid:   #ffffff;
+        --panel-2:       rgba(255, 255, 255, 0.86);
+        --panel-3:       #f8fafc;
+        --text:          #0b1220;
+        --text-2:        #1e293b;
+        --muted:         #64748b;
+        --border:        rgba(15, 23, 42, 0.08);
+        --border-strong: rgba(15, 23, 42, 0.16);
+        --accent:        #5b6cff;
+        --accent-2:      #a855f7;
+        --accent-3:      #06b6d4;
+        --good:          #10b981;
+        --bad:           #ef4444;
+        --warn:          #f59e0b;
+
+        --shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.06);
+        --shadow-md:  0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
+        --shadow-lg:  0 24px 48px -16px rgba(15, 23, 42, 0.18), 0 8px 16px -8px rgba(15, 23, 42, 0.1);
+        --shadow-glow: 0 8px 32px -8px rgba(91, 108, 255, 0.35);
+
+        --blob-1: rgba(91, 108, 255, 0.22);
+        --blob-2: rgba(168, 85, 247, 0.18);
+        --blob-3: rgba(6, 182, 212, 0.16);
+
+        --code-bg: rgba(15, 23, 42, 0.045);
+      }
+
+      [data-theme="dark"] {
+        --bg:            #0a0f1c;
+        --bg-grad-a:     #0e1530;
+        --bg-grad-b:     #1a0f2e;
+        --bg-grad-c:     #07182a;
+        --panel:         rgba(255, 255, 255, 0.04);
+        --panel-solid:   #131a2c;
+        --panel-2:       rgba(255, 255, 255, 0.06);
+        --panel-3:       #1a223a;
+        --text:          #eef2ff;
+        --text-2:        #cbd5e1;
+        --muted:         #93a0b8;
+        --border:        rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --accent:        #818cf8;
+        --accent-2:      #c084fc;
+        --accent-3:      #22d3ee;
+        --good:          #34d399;
+        --bad:           #fb7185;
+        --warn:          #fbbf24;
+
+        --shadow-sm:  0 1px 2px rgba(0,0,0,0.35);
+        --shadow-md:  0 8px 18px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25);
+        --shadow-lg:  0 30px 60px -20px rgba(0,0,0,0.6), 0 10px 24px -10px rgba(0,0,0,0.4);
+        --shadow-glow: 0 8px 32px -8px rgba(129, 140, 248, 0.45);
+
+        --blob-1: rgba(129, 140, 248, 0.28);
+        --blob-2: rgba(192, 132, 252, 0.22);
+        --blob-3: rgba(34, 211, 238, 0.18);
+
+        --code-bg: rgba(255, 255, 255, 0.06);
+      }
+
+      /* per-tool accents (same in both themes) */
       :root {
-        --bg: #0b0f17;
-        --panel: #121826;
-        --panel-2: #161d2e;
-        --border: #1e2740;
-        --text: #e6edf3;
-        --muted: #8b97aa;
-        --accent: #7aa2f7;
-        --good: #98c379;
-        --bad: #e06c75;
-        --warn: #e5c07b;
+        --c-slack:    #ecb22e;
+        --c-clickup:  #7b68ee;
+        --c-sf:       #29b5e8;
+        --c-pg:       #336791;
+        --c-repo:     #a78bfa;
+        --c-registry: #f97316;
+        --c-git:      #f06b3a;
+        --c-github:   #b07cff;
+        --c-s3:       #f59e0b;
+        --c-temporal: #10b981;
+        --c-submit:   #22c55e;
       }
+
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-          Arial, sans-serif; font-size: 14px; line-height: 1.5; height: 100%; }
-      header {
-        padding: 14px 20px; border-bottom: 1px solid var(--border);
-        display: flex; align-items: center; gap: 12px;
-        background: linear-gradient(180deg, #0f1525 0%, #0b0f17 100%);
+      html, body {
+        margin: 0; padding: 0; height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px; line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: "cv11", "ss03";
+        transition: background 0.4s ease, color 0.3s ease;
       }
-      header .logo { font-weight: 700; letter-spacing: 0.2px; font-size: 16px; }
-      header .badge {
-        font-size: 11px; padding: 2px 8px; border-radius: 9999px;
-        background: #1f2a44; color: var(--accent); border: 1px solid #2a3760;
+      body {
+        position: relative; overflow: hidden;
+      }
+      /* animated background blobs */
+      .blobs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+      .blob {
+        position: absolute; border-radius: 50%; filter: blur(80px);
+        opacity: 0.9; animation: float 18s ease-in-out infinite;
+      }
+      .blob.b1 { width: 520px; height: 520px; background: var(--blob-1); top: -180px; left: -120px; }
+      .blob.b2 { width: 460px; height: 460px; background: var(--blob-2); bottom: -160px; right: -100px; animation-delay: -6s; }
+      .blob.b3 { width: 380px; height: 380px; background: var(--blob-3); top: 35%; left: 50%; transform: translateX(-50%); animation-delay: -12s; }
+      @keyframes float {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -40px) scale(1.05); }
+        66% { transform: translate(-20px, 30px) scale(0.97); }
+      }
+      .blob.b3 { animation-name: floatCenter; }
+      @keyframes floatCenter {
+        0%, 100% { transform: translate(-50%, 0) scale(1); }
+        50% { transform: translate(-50%, -30px) scale(1.06); }
+      }
+
+      /* =====================================================================
+         LAYOUT
+         ===================================================================== */
+      header {
+        position: relative; z-index: 5;
+        padding: 14px 22px;
+        display: flex; align-items: center; gap: 14px;
+        background: var(--panel);
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        border-bottom: 1px solid var(--border);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .brand .mark {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: grid; place-items: center;
+        color: white; font-weight: 800; font-size: 14px;
+        box-shadow: var(--shadow-glow);
+      }
+      .brand .name {
+        font-weight: 800; font-size: 16px; letter-spacing: -0.2px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .brand .badge {
+        font-size: 10.5px; padding: 3px 9px; border-radius: 9999px;
+        background: var(--panel-2); color: var(--accent);
+        border: 1px solid var(--border-strong); font-weight: 600;
+        letter-spacing: 0.04em; text-transform: uppercase;
       }
       header .spacer { flex: 1; }
+      .elapsed {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+        padding: 3px 8px; border: 1px solid var(--border);
+        border-radius: 6px; background: var(--panel-2);
+      }
+      .icon-btn {
+        width: 34px; height: 34px; border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text-2); cursor: pointer;
+        display: grid; place-items: center;
+        transition: all 0.18s ease;
+      }
+      .icon-btn:hover { background: var(--panel-solid); border-color: var(--border-strong); transform: translateY(-1px); }
+      .icon-btn svg { width: 16px; height: 16px; }
+      [data-theme="light"] .moon { display: block; }
+      [data-theme="light"] .sun { display: none; }
+      [data-theme="dark"] .moon { display: none; }
+      [data-theme="dark"] .sun { display: block; }
+
       main {
-        display: grid; grid-template-columns: 380px 1fr; gap: 0;
-        height: calc(100vh - 53px); min-height: 0;
+        position: relative; z-index: 1;
+        display: grid; grid-template-columns: 380px 1fr;
+        height: calc(100vh - 57px); min-height: 0;
       }
       .left {
         border-right: 1px solid var(--border);
-        padding: 16px; overflow-y: auto; background: var(--panel);
+        padding: 18px; overflow-y: auto;
+        background: var(--panel);
+        backdrop-filter: saturate(160%) blur(14px);
+        -webkit-backdrop-filter: saturate(160%) blur(14px);
       }
-      .right {
-        padding: 16px; overflow-y: auto;
-      }
-      label.stack { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .right { padding: 24px 28px; overflow-y: auto; min-width: 0; }
+
+      /* =====================================================================
+         FORM
+         ===================================================================== */
+      label.stack { display: block; font-size: 12px; color: var(--muted);
+        margin-bottom: 6px; font-weight: 500; letter-spacing: 0.01em; }
       input[type="text"], textarea {
-        width: 100%; background: var(--panel-2); color: var(--text);
-        border: 1px solid var(--border); border-radius: 8px;
-        padding: 10px 12px; font-family: inherit; font-size: 14px;
+        width: 100%; background: var(--panel-solid); color: var(--text);
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 11px 13px; font-family: inherit; font-size: 14px;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        box-shadow: var(--shadow-sm);
       }
-      input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--accent); }
-      button {
-        background: var(--accent); color: #0b0f17; border: none;
-        border-radius: 8px; padding: 10px 14px; font-weight: 600;
-        cursor: pointer; font-size: 13px;
+      input[type="text"]:focus, textarea:focus {
+        outline: none; border-color: var(--accent);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow-sm);
       }
-      button.secondary {
-        background: transparent; border: 1px solid var(--border); color: var(--text);
+
+      .btn {
+        position: relative;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white; border: none;
+        border-radius: 10px; padding: 11px 16px; font-weight: 600;
+        cursor: pointer; font-size: 13.5px;
+        transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.18s ease;
+        box-shadow: var(--shadow-glow);
+        display: inline-flex; align-items: center; gap: 8px;
       }
-      button:disabled { opacity: 0.5; cursor: not-allowed; }
-      .row { display: flex; gap: 8px; align-items: center; }
+      .btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+      .btn:active { transform: translateY(0); }
+      .btn.secondary {
+        background: var(--panel-solid); color: var(--text);
+        border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+      }
+      .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+      .row { display: flex; gap: 10px; align-items: center; }
       .pill {
         display: inline-flex; align-items: center; gap: 6px;
-        background: var(--panel-2); border: 1px solid var(--border);
+        background: var(--panel-solid); border: 1px solid var(--border);
         padding: 4px 10px; border-radius: 9999px; font-size: 12px; color: var(--muted);
+        transition: all 0.18s ease;
       }
-      .pill.good { color: var(--good); border-color: #2a4a2a; }
-      .pill.bad { color: var(--bad); border-color: #4a2a2a; }
-      .pill.warn { color: var(--warn); }
-      .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
-        color: var(--muted); margin: 16px 0 8px; }
-      .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px; background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 8px; padding: 10px; max-height: 360px; overflow-y: auto;
-        white-space: pre-wrap; word-break: break-word; }
+      .pill.good { color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent);
+        background: color-mix(in srgb, var(--good) 8%, transparent); }
+      .pill.bad  { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+        background: color-mix(in srgb, var(--bad) 8%, transparent); }
+      .pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+        background: color-mix(in srgb, var(--warn) 8%, transparent); }
+      .pill.clickable { cursor: pointer; }
+      .pill.clickable:hover { border-color: var(--accent); color: var(--accent); }
+      .pill.copied { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+
+      .section-title {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--muted); margin: 18px 0 8px; font-weight: 600;
+      }
+
+      .log {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 11.5px; background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 10px; padding: 10px 12px;
+        max-height: 280px; overflow-y: auto;
+        white-space: pre-wrap; word-break: break-word; box-shadow: var(--shadow-sm);
+      }
       .log .line { padding: 1px 0; }
       .log .line.start { color: var(--accent); }
       .log .line.ok { color: var(--good); }
       .log .line.err { color: var(--bad); }
       .log .line.muted { color: var(--muted); }
-      .card { background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-      .card h3 { margin: 0 0 8px; font-size: 14px; }
-      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+      .card {
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 14px; padding: 18px 20px; margin-bottom: 14px;
+        box-shadow: var(--shadow-md);
+      }
+      .card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
+
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-      th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
-      .conf-bar { background: var(--bg); border-radius: 8px; height: 6px; overflow: hidden; }
-      .conf-bar > span { display: block; height: 100%; background: var(--accent); }
-      details { background: var(--panel-2); border: 1px solid var(--border);
-        border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+      th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase;
+        letter-spacing: 0.08em; }
+      tr:last-child td { border-bottom: none; }
+
+      .conf-bar { background: var(--code-bg); border-radius: 8px; height: 8px; overflow: hidden; }
+      .conf-bar > span { display: block; height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+      details { background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;
+        box-shadow: var(--shadow-sm); }
       details > summary { cursor: pointer; font-weight: 600; }
-      .tag { display: inline-block; padding: 2px 8px; border-radius: 4px;
-        font-size: 11px; background: var(--panel); border: 1px solid var(--border);
-        color: var(--muted); margin-right: 4px; }
-      .tag.passed { color: var(--good); border-color: #2a4a2a; }
-      .tag.failed { color: var(--bad); border-color: #4a2a2a; }
+      .tag { display: inline-block; padding: 3px 9px; border-radius: 6px;
+        font-size: 11px; background: var(--code-bg); border: 1px solid var(--border);
+        color: var(--muted); margin-right: 4px; font-weight: 500; }
+      .tag.passed { color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent);
+        background: color-mix(in srgb, var(--good) 8%, transparent); }
+      .tag.failed { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+        background: color-mix(in srgb, var(--bad) 8%, transparent); }
       .tag.inconclusive { color: var(--warn); }
       .tag.skipped, .tag.not_run { color: var(--muted); }
-      .empty {
-        color: var(--muted); text-align: center; padding: 60px 20px;
-      }
+
       a { color: var(--accent); text-decoration: none; }
       a:hover { text-decoration: underline; }
-      code { background: #0b0f17; padding: 1px 5px; border-radius: 4px; }
+      code { background: var(--code-bg); padding: 1px 6px; border-radius: 5px;
+        font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.92em; }
+
+      /* =====================================================================
+         EMPTY STATE
+         ===================================================================== */
+      .empty {
+        max-width: 880px; margin: 28px auto 0;
+      }
+      .hero {
+        background:
+          linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent),
+                                  color-mix(in srgb, var(--accent-2) 12%, transparent));
+        border: 1px solid var(--border);
+        border-radius: 22px; padding: 36px 38px;
+        box-shadow: var(--shadow-lg);
+        position: relative; overflow: hidden;
+      }
+      .hero::before {
+        content: ""; position: absolute; inset: 0;
+        background: radial-gradient(600px 240px at 100% 0%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 60%);
+        pointer-events: none;
+      }
+      .hero .eyebrow {
+        font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--accent);
+        margin-bottom: 8px;
+      }
+      .hero h1 {
+        margin: 0 0 12px; font-size: 32px; line-height: 1.15;
+        font-weight: 800; letter-spacing: -0.5px;
+        background: linear-gradient(90deg, var(--text), var(--accent));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .hero .lead { font-size: 15px; color: var(--text-2); max-width: 640px; }
+      .hero .lead strong { color: var(--text); }
+      .hero .example {
+        margin-top: 18px; padding: 10px 14px;
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 10px;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 12.5px; color: var(--text);
+        display: inline-flex; align-items: center; gap: 8px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .features {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+        margin-top: 18px;
+      }
+      .feature {
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 14px; padding: 16px 18px;
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+      .feature:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+      .feature .icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        display: grid; place-items: center; font-size: 18px;
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent-2) 22%, transparent));
+        margin-bottom: 10px;
+      }
+      .feature h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+      .feature p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+      /* =====================================================================
+         NOW HERO
+         ===================================================================== */
+      .now {
+        position: relative; overflow: hidden;
+        background: linear-gradient(135deg,
+          color-mix(in srgb, var(--accent) 10%, var(--panel-solid)),
+          color-mix(in srgb, var(--accent-2) 10%, var(--panel-solid)));
+        border: 1px solid var(--border-strong);
+        border-radius: 16px;
+        padding: 22px 24px; margin-bottom: 18px;
+        box-shadow: var(--shadow-md);
+        transition: all 0.25s ease;
+      }
+      .now::before {
+        content: ""; position: absolute; inset: 0;
+        background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent) 18%, transparent) 50%, transparent 100%);
+        transform: translateX(-100%);
+        animation: sweep 2.4s linear infinite;
+      }
+      .now.idle::before { animation: none; opacity: 0; }
+      .now.error {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--bad) 12%, var(--panel-solid)), color-mix(in srgb, var(--bad) 6%, var(--panel-solid)));
+        border-color: color-mix(in srgb, var(--bad) 40%, transparent);
+      }
+      .now.error::before { display: none; }
+      .now.success {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--good) 12%, var(--panel-solid)), color-mix(in srgb, var(--good) 6%, var(--panel-solid)));
+        border-color: color-mix(in srgb, var(--good) 40%, transparent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--good) 22%, transparent), var(--shadow-md);
+      }
+      .now.success::before { display: none; }
+      @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+      .now-row { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
+      .now-dot {
+        flex: 0 0 14px; width: 14px; height: 14px; border-radius: 50%;
+        background: var(--accent);
+        animation: pulse 1.4s ease-out infinite;
+      }
+      .now.idle .now-dot { background: var(--muted); animation: none; }
+      .now.error .now-dot { background: var(--bad); animation: none; }
+      .now.success .now-dot { background: var(--good); animation: none; }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+        70% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
+        100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+      }
+      .now-title {
+        font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+        display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+      }
+      .now-title .dots::after {
+        content: ""; display: inline-block; width: 1ch; animation: dots 1.2s steps(4, end) infinite;
+      }
+      .now.idle .now-title .dots::after,
+      .now.success .now-title .dots::after,
+      .now.error .now-title .dots::after { display: none; }
+      @keyframes dots {
+        0%, 20% { content: ""; }
+        40% { content: "."; }
+        60% { content: ".."; }
+        80%, 100% { content: "..."; }
+      }
+      .now-sub {
+        margin-top: 6px; color: var(--text-2); font-size: 13px;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;
+      }
+      .now-meta {
+        margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap;
+        font-size: 12px; color: var(--muted); position: relative; z-index: 1;
+        align-items: center;
+      }
+      .now-meta .stat-num { color: var(--text); font-weight: 600;
+        font-variant-numeric: tabular-nums; }
+
+      /* =====================================================================
+         PHASE STRIP
+         ===================================================================== */
+      .phases {
+        display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+        margin-bottom: 20px; position: relative;
+      }
+      .phase {
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 12px; padding: 12px 14px; position: relative;
+        transition: all 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+        box-shadow: var(--shadow-sm);
+      }
+      .phase .phase-icon {
+        width: 26px; height: 26px; border-radius: 7px;
+        background: var(--code-bg);
+        display: grid; place-items: center; font-size: 14px;
+        margin-bottom: 8px; transition: all 0.25s ease;
+      }
+      .phase .phase-name {
+        font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--muted); font-weight: 700;
+      }
+      .phase .phase-desc { font-size: 13px; margin-top: 2px; color: var(--text); font-weight: 500; }
+      .phase.active {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--panel-solid)), var(--panel-solid));
+        border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent), var(--shadow-glow);
+        transform: translateY(-1px);
+      }
+      .phase.active .phase-icon {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white;
+      }
+      .phase.active .phase-name { color: var(--accent); }
+      .phase.done {
+        border-color: color-mix(in srgb, var(--good) 40%, transparent);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--good) 8%, var(--panel-solid)), var(--panel-solid));
+      }
+      .phase.done .phase-icon { background: var(--good); color: white; }
+      .phase.done .phase-name { color: var(--good); }
+      .phase.done .phase-name::before { content: "✓ "; }
+      .phase.error {
+        border-color: color-mix(in srgb, var(--bad) 40%, transparent);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--bad) 8%, var(--panel-solid)), var(--panel-solid));
+      }
+      .phase.error .phase-icon { background: var(--bad); color: white; }
+      .phase.error .phase-name { color: var(--bad); }
+      .phase.error .phase-name::before { content: "✕ "; }
+
+      /* =====================================================================
+         TOOL CARDS
+         ===================================================================== */
+      .tools-stream { display: flex; flex-direction: column; gap: 8px; }
+      .tool-card {
+        background: var(--panel-solid);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 12px; padding: 12px 14px;
+        display: grid; grid-template-columns: 36px 1fr auto; gap: 12px;
+        align-items: center; box-shadow: var(--shadow-sm);
+        animation: slideIn 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+        cursor: pointer;
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.18s ease;
+      }
+      .tool-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .tool-card.running {
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent), var(--shadow-sm);
+      }
+      .tool-card.err { border-left-color: var(--bad); }
+      .tool-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        display: grid; place-items: center; font-size: 18px;
+        background: var(--code-bg);
+      }
+      .tool-body { min-width: 0; }
+      .tool-name {
+        font-weight: 600; font-size: 13.5px; display: inline-flex; align-items: center;
+      }
+      .tool-name .dur { color: var(--muted); font-weight: 400; margin-left: 8px;
+        font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; }
+      .tool-args {
+        margin-top: 2px; font-size: 12px; color: var(--muted);
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .tool-meta { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+      .tool-card .expand-row {
+        grid-column: 1 / -1;
+        display: none; margin-top: 10px; padding-top: 12px;
+        border-top: 1px dashed var(--border-strong);
+      }
+      .tool-card.expanded .expand-row { display: block; }
+      .tool-card .kv {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 12px; color: var(--text);
+        background: var(--code-bg); border: 1px solid var(--border);
+        border-radius: 8px; padding: 10px 12px;
+        white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto;
+      }
+      .spinner {
+        width: 14px; height: 14px; border-radius: 50%;
+        border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* =====================================================================
+         BANNER
+         ===================================================================== */
+      .banner {
+        display: flex; gap: 12px; align-items: flex-start;
+        padding: 14px 16px; border-radius: 12px; margin-bottom: 16px;
+        background: color-mix(in srgb, var(--warn) 9%, var(--panel-solid));
+        border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+        font-size: 13px; box-shadow: var(--shadow-sm);
+      }
+      .banner.error {
+        background: color-mix(in srgb, var(--bad) 9%, var(--panel-solid));
+        border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+      }
+      .banner .banner-icon {
+        width: 30px; height: 30px; flex: 0 0 30px;
+        border-radius: 8px; display: grid; place-items: center; font-size: 16px;
+        background: color-mix(in srgb, var(--warn) 18%, transparent);
+        color: var(--warn);
+      }
+      .banner.error .banner-icon {
+        background: color-mix(in srgb, var(--bad) 18%, transparent);
+        color: var(--bad);
+      }
+      .banner strong { color: var(--text); font-size: 13.5px; }
+      .banner ul { margin: 6px 0 0 0; padding: 0; list-style: none; color: var(--text-2); }
+      .banner ul li {
+        margin: 4px 0; padding-left: 18px; position: relative; font-size: 12.5px;
+      }
+      .banner ul li::before {
+        content: ""; position: absolute; left: 6px; top: 8px;
+        width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+      }
+      .banner ul li.error::before { background: var(--bad); }
+      .banner ul li.warn::before  { background: var(--warn); }
+      .banner .footnote { margin-top: 6px; color: var(--muted); font-size: 12px; }
+
+      /* =====================================================================
+         VERDICT BANNER (per verdict_kind)
+         ===================================================================== */
+      .verdict {
+        position: relative; overflow: hidden;
+        border-radius: 16px; padding: 22px 24px; margin-bottom: 18px;
+        border: 1px solid var(--border-strong);
+        box-shadow: var(--shadow-md);
+      }
+      .verdict .v-eyebrow {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+        padding: 4px 10px; border-radius: 9999px; margin-bottom: 12px;
+        background: rgba(255,255,255,0.6); color: var(--text-2);
+      }
+      [data-theme="dark"] .verdict .v-eyebrow { background: rgba(255,255,255,0.07); }
+      .verdict h2 {
+        margin: 0 0 6px; font-size: 22px; font-weight: 700;
+        letter-spacing: -0.3px; line-height: 1.25;
+      }
+      .verdict p { margin: 0; font-size: 14.5px; color: var(--text-2); line-height: 1.55; }
+      .verdict .v-meta { margin-top: 12px; color: var(--muted); font-size: 12px; }
+      .verdict.kind-root_cause_found {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--good) 14%, var(--panel-solid)),
+                                            color-mix(in srgb, var(--good) 6%, var(--panel-solid)));
+        border-color: color-mix(in srgb, var(--good) 40%, transparent);
+      }
+      .verdict.kind-root_cause_found .v-eyebrow { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+      .verdict.kind-needs_ui_verification {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--accent-3) 14%, var(--panel-solid)),
+                                            color-mix(in srgb, var(--accent) 8%, var(--panel-solid)));
+        border-color: color-mix(in srgb, var(--accent-3) 40%, transparent);
+      }
+      .verdict.kind-needs_ui_verification .v-eyebrow { color: var(--accent-3); background: color-mix(in srgb, var(--accent-3) 14%, transparent); }
+      .verdict.kind-needs_deeper_probe {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--warn) 14%, var(--panel-solid)),
+                                            color-mix(in srgb, var(--warn) 6%, var(--panel-solid)));
+        border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+      }
+      .verdict.kind-needs_deeper_probe .v-eyebrow { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+      .verdict.kind-inconclusive {
+        background: linear-gradient(135deg, var(--panel-solid), var(--panel-3));
+      }
+
+      /* =====================================================================
+         VIEW TOGGLE — Business / Technical
+         ===================================================================== */
+      .view-toggle {
+        display: inline-flex; padding: 3px; border-radius: 10px;
+        background: var(--panel-3); border: 1px solid var(--border);
+        gap: 2px;
+      }
+      .view-toggle button {
+        background: transparent; border: none; padding: 7px 14px;
+        font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+        border-radius: 7px; box-shadow: none;
+        transition: all 0.18s ease;
+      }
+      .view-toggle button:hover { color: var(--text); }
+      .view-toggle button.active {
+        background: var(--panel-solid); color: var(--text);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .view-bar {
+        display: flex; justify-content: space-between; align-items: center;
+        margin: 6px 0 14px;
+      }
+      .view-bar .audience-hint { font-size: 12px; color: var(--muted); }
+
+      /* =====================================================================
+         NEXT-ACTION CARDS
+         ===================================================================== */
+      .actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+      .action {
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 12px; padding: 14px 16px;
+        box-shadow: var(--shadow-sm);
+        display: grid; grid-template-columns: 36px 1fr; gap: 14px;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
+      }
+      .action:hover { border-color: var(--border-strong); }
+      .action.k-human_verify_ui { border-left: 3px solid var(--accent-3); }
+      .action.k-run_deep_probe  { border-left: 3px solid var(--warn); }
+      .action.k-review_pr       { border-left: 3px solid var(--accent); }
+      .action.k-manual_fix      { border-left: 3px solid var(--accent-2); }
+      .action.k-info            { border-left: 3px solid var(--muted); }
+      .action-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        display: grid; place-items: center; font-size: 18px;
+        background: var(--code-bg);
+      }
+      .action h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+      .action .audience-tag {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+        color: var(--muted); margin-left: 8px;
+      }
+      .action p { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+      .action .probe-row { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+      .action .probe-tool {
+        font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px;
+        padding: 3px 8px; background: var(--code-bg); border-radius: 6px;
+        border: 1px solid var(--border); color: var(--muted);
+      }
+      .btn-sm {
+        padding: 7px 12px; font-size: 12.5px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 6px;
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.14s ease, filter 0.18s ease;
+      }
+      .btn-sm:hover { transform: translateY(-1px); filter: brightness(1.06); }
+      .btn-sm:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+      .probe-result {
+        margin-top: 10px; padding: 12px; border-radius: 10px;
+        background: var(--code-bg); border: 1px solid var(--border);
+        font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+        color: var(--text); white-space: pre-wrap; word-break: break-word;
+        max-height: 280px; overflow: auto;
+      }
+      .probe-result.err { border-color: color-mix(in srgb, var(--bad) 40%, transparent);
+        background: color-mix(in srgb, var(--bad) 6%, var(--panel-solid)); }
+      .probe-result.ok { border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+
+      /* =====================================================================
+         INVESTIGATION PLAN
+         ===================================================================== */
+      .plan-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 8px;
+      }
+      .plan-item {
+        background: var(--panel-solid); border: 1px solid var(--border);
+        border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow-sm);
+      }
+      .plan-item .plan-layer {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); font-weight: 700;
+        display: flex; align-items: center; gap: 6px;
+      }
+      .plan-item .plan-desc { font-size: 13px; margin-top: 4px; color: var(--text); font-weight: 500; }
+      .plan-item .plan-reason { font-size: 12px; margin-top: 4px; color: var(--muted); line-height: 1.45; }
+      .plan-item.checked { border-left: 3px solid var(--good); }
+      .plan-item.skipped { border-left: 3px solid var(--muted); opacity: 0.85; }
+      .plan-item.checked .plan-layer::before { content: "✓"; color: var(--good); }
+      .plan-item.skipped .plan-layer::before { content: "—"; color: var(--muted); }
     </style>
   </head>
   <body>
+    <div class="blobs">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+    </div>
+
     <header>
-      <div class="logo">sla-crushers</div>
-      <div class="badge">RCA Agent</div>
+      <div class="brand">
+        <div class="mark">S</div>
+        <div class="name">sla-crushers</div>
+        <div class="badge">RCA Agent</div>
+      </div>
       <div class="spacer"></div>
+      <div id="elapsed" class="elapsed">—</div>
       <div id="status" class="pill">idle</div>
+      <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
     </header>
+
     <main>
       <aside class="left">
         <label class="stack" for="slack-url">Slack message link</label>
         <input id="slack-url" type="text"
           placeholder="https://workspace.slack.com/archives/C…/p…" />
-        <div class="row" style="margin-top: 10px;">
-          <button id="run-btn">Run RCA</button>
-          <button id="reset-btn" class="secondary" type="button">Reset</button>
+        <div class="row" style="margin-top: 12px;">
+          <button id="run-btn" class="btn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Run RCA
+          </button>
+          <button id="reset-btn" class="btn secondary" type="button">Reset</button>
         </div>
 
-        <div class="section-title">Live tool calls</div>
+        <div class="section-title">Trace</div>
         <div id="log" class="log"></div>
 
         <div class="section-title">Run id</div>
-        <div id="run-id" class="pill" style="font-family: ui-monospace, monospace;">—</div>
+        <div id="run-id" class="pill clickable" title="Click to copy">—</div>
       </aside>
 
-      <section class="right" id="report">
-        <div class="empty">
-          Paste a Slack <code>#dogfooding</code> message link on the left and hit
-          <strong>Run RCA</strong>. The agent will fetch the thread, classify the issue,
-          investigate Snowflake / Postgres / spider source / git history, and post
-          a structured RCA back here.
-        </div>
-      </section>
+      <section class="right" id="report"></section>
     </main>
 
     <script>
       const $ = (sel) => document.querySelector(sel);
       const log = $("#log");
       const report = $("#report");
-      const status = $("#status");
+      const statusPill = $("#status");
+      const elapsedEl = $("#elapsed");
+
+      // =================================================================
+      // THEME
+      // =================================================================
+      function applyTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        try { localStorage.setItem("sla-theme", theme); } catch (_) {}
+      }
+      (function initTheme() {
+        let saved = null;
+        try { saved = localStorage.getItem("sla-theme"); } catch (_) {}
+        if (saved === "dark" || saved === "light") { applyTheme(saved); return; }
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        applyTheme(prefersDark ? "dark" : "light");
+      })();
+      $("#theme-toggle").addEventListener("click", () => {
+        const cur = document.documentElement.getAttribute("data-theme") || "light";
+        applyTheme(cur === "dark" ? "light" : "dark");
+      });
+
+      // =================================================================
+      // PHASE MODEL + TOOL ICONS/COLORS
+      // =================================================================
+      const PHASES = [
+        { key: "fetch",  name: "Slack",       desc: "Fetch thread", icon: "💬" },
+        { key: "issue",  name: "Issue",       desc: "Classify",     icon: "🧠" },
+        { key: "invest", name: "Investigate", desc: "Tools loop",   icon: "🔍" },
+        { key: "submit", name: "Submit",      desc: "RCA report",   icon: "📋" },
+        { key: "post",   name: "Post",        desc: "Reply in Slack", icon: "📤" },
+      ];
+
+      const TOOL_ICONS = {
+        "slack.get_thread":   "💬", "slack.post_reply":  "📤",
+        "clickup.get_ticket": "🎫",
+        "snowflake.query":    "❄️", "snowflake.list_tables": "❄️", "snowflake.describe": "❄️",
+        "postgres.query":     "🐘", "postgres.list_tables":  "🐘", "postgres.describe":  "🐘",
+        "repo.search":        "🔎", "repo.read":             "📄",
+        "registry.resolve":   "🧭",
+        "temporal.history":   "⏱️",
+        "s3.list":            "🪣", "s3.read":               "🪣",
+        "git.log":            "🌿", "git.show":              "🌿", "git.blame":           "🌿",
+        "github.list_prs":    "🐙", "github.get_pr":         "🐙", "github.open_pr":      "🐙",
+        "submit_rca":         "📋",
+      };
+      const TOOL_COLORS = {
+        "slack.get_thread":   "var(--c-slack)",    "slack.post_reply":      "var(--c-slack)",
+        "clickup.get_ticket": "var(--c-clickup)",
+        "snowflake.query":    "var(--c-sf)",       "snowflake.list_tables": "var(--c-sf)", "snowflake.describe": "var(--c-sf)",
+        "postgres.query":     "var(--c-pg)",       "postgres.list_tables":  "var(--c-pg)", "postgres.describe":  "var(--c-pg)",
+        "repo.search":        "var(--c-repo)",     "repo.read":             "var(--c-repo)",
+        "registry.resolve":   "var(--c-registry)",
+        "temporal.history":   "var(--c-temporal)",
+        "s3.list":            "var(--c-s3)",       "s3.read":               "var(--c-s3)",
+        "git.log":            "var(--c-git)",      "git.show":              "var(--c-git)", "git.blame":  "var(--c-git)",
+        "github.list_prs":    "var(--c-github)",   "github.get_pr":         "var(--c-github)", "github.open_pr": "var(--c-github)",
+        "submit_rca":         "var(--c-submit)",
+      };
+      function iconFor(tool)  { return TOOL_ICONS[tool] || "🛠"; }
+      function colorFor(tool) { return TOOL_COLORS[tool] || "var(--accent)"; }
+
+      function classifyPhase(message) {
+        const m = (message || "").toLowerCase();
+        if (m.includes("slack thread") || m.includes("clickup")) return "fetch";
+        if (m.includes("extracting structured")) return "issue";
+        if (m.includes("reason")) return "invest";
+        if (m.includes("opening draft pr")) return "submit";
+        if (m.includes("posting rca to slack")) return "post";
+        return null;
+      }
+      function phaseForTool(tool) {
+        if (tool === "slack.get_thread" || tool === "clickup.get_ticket") return "fetch";
+        if (tool === "submit_rca") return "submit";
+        if (tool === "slack.post_reply") return "post";
+        return "invest";
+      }
+
+      // =================================================================
+      // STATE
+      // =================================================================
+      let runState = null;
+      let elapsedTimer = null;
+      let preflightBanner = "";
+      // "business" or "technical" — defaults to business so PMs / non-tech land in friendly view
+      let viewMode = (function () {
+        try { return localStorage.getItem("sla-view") || "business"; } catch (_) { return "business"; }
+      })();
+
+      // Keyed by next-action index — stores {state: "idle"|"running"|"ok"|"err", result: any}
+      let probeResults = {};
+
+      function setViewMode(mode) {
+        viewMode = mode;
+        try { localStorage.setItem("sla-view", mode); } catch (_) {}
+        renderLive();
+      }
+
+      function freshState() {
+        return {
+          phases: Object.fromEntries(PHASES.map(p => [p.key, "pending"])),
+          activePhase: null, activeStatus: null,
+          startedAt: Date.now(),
+          toolCount: 0, toolOkCount: 0, toolFailCount: 0,
+          budgetLeft: null,
+          tools: [], finalRca: null, finalError: null, finalErrorWhere: null,
+          done: false, runId: null,
+        };
+      }
+
+      function fmtElapsed(ms) {
+        if (ms < 1000) return ms + "ms";
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        return m ? `${m}m ${s % 60}s` : `${s}s`;
+      }
+
+      function startElapsedTicker() {
+        if (elapsedTimer) clearInterval(elapsedTimer);
+        elapsedTimer = setInterval(() => {
+          if (!runState) return;
+          elapsedEl.textContent = fmtElapsed(Date.now() - runState.startedAt);
+          if (runState.done) { clearInterval(elapsedTimer); elapsedTimer = null; }
+          if (!runState.done) renderLive();
+        }, 1000);
+      }
 
       function appendLog(text, cls = "") {
         const div = document.createElement("div");
@@ -153,15 +930,11 @@
         log.appendChild(div);
         log.scrollTop = log.scrollHeight;
       }
-
-      function clearLog() {
-        log.innerHTML = "";
-        report.innerHTML = '<div class="empty">Investigation in progress…</div>';
-      }
+      function clearLog() { log.innerHTML = ""; }
 
       function setStatus(text, cls = "") {
-        status.textContent = text;
-        status.className = "pill " + cls;
+        statusPill.textContent = text;
+        statusPill.className = "pill " + cls;
       }
 
       function fmtArgs(args) {
@@ -170,32 +943,339 @@
           return s.length > 220 ? s.slice(0, 220) + "…" : s;
         } catch (_) { return ""; }
       }
+      function fmtArgsPretty(args) {
+        try { return JSON.stringify(args || {}, null, 2); } catch (_) { return String(args); }
+      }
+      function escape(s) {
+        return String(s == null ? "" : s)
+          .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+      }
 
-      function renderRca(rca) {
+      // =================================================================
+      // RENDER — empty
+      // =================================================================
+      function renderEmpty() {
+        let html = preflightBanner || "";
+        html += `
+          <div class="empty">
+            <div class="hero">
+              <h1>Slack link in. RCA out.</h1>
+              <div class="example">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+                https://gobblecube.slack.com/archives/C…/p1700…
+              </div>
+            </div>
+          </div>`;
+        report.innerHTML = html;
+      }
+
+      // =================================================================
+      // RENDER — live
+      // =================================================================
+      function renderLive() {
+        if (!runState) { renderEmpty(); return; }
+        const s = runState;
+        let html = preflightBanner || "";
+
+        // ---- Now hero ----
+        const lastTool = s.tools[s.tools.length - 1];
+        let nowClass = "now";
+        let nowTitle = "Working";
+        let nowSub = "";
+        if (s.finalError) {
+          nowClass += " error";
+          nowTitle = "Run failed";
+          nowSub = s.finalError;
+        } else if (s.finalRca) {
+          nowClass += " success";
+          nowTitle = "RCA complete";
+          nowSub = s.finalRca.summary || "Report ready below.";
+        } else if (s.activeStatus) {
+          nowTitle = s.activeStatus;
+          if (lastTool && lastTool.status === "running") {
+            nowSub = lastTool.tool + "  " + fmtArgs(lastTool.args);
+          }
+        } else { nowClass += " idle"; nowTitle = "Idle"; }
+
+        const elapsedMs = Date.now() - s.startedAt;
+
+        html += `
+          <div class="${nowClass}">
+            <div class="now-row">
+              <div class="now-dot"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div class="now-title">${escape(nowTitle)}<span class="dots"></span></div>
+                ${nowSub ? `<div class="now-sub">${escape(nowSub)}</div>` : ""}
+              </div>
+            </div>
+            <div class="now-meta">
+              <span><span class="stat-num">${s.toolCount}</span> tool calls</span>
+              <span>✓ <span class="stat-num">${s.toolOkCount}</span> ok</span>
+              ${s.toolFailCount ? `<span>✗ <span class="stat-num">${s.toolFailCount}</span> failed</span>` : ""}
+              ${s.budgetLeft != null ? `<span>budget left: <span class="stat-num">${s.budgetLeft}</span></span>` : ""}
+              <span style="margin-left: auto;">⏱ <span class="stat-num">${fmtElapsed(elapsedMs)}</span></span>
+            </div>
+          </div>
+        `;
+
+        // ---- Phases ----
+        html += `<div class="phases">`;
+        for (const p of PHASES) {
+          const st = s.phases[p.key];
+          html += `
+            <div class="phase ${st}">
+              <div class="phase-icon">${p.icon}</div>
+              <div class="phase-name">${escape(p.name)}</div>
+              <div class="phase-desc">${escape(p.desc)}</div>
+            </div>`;
+        }
+        html += `</div>`;
+
+        // ---- Tool stream ----
+        if (s.tools.length) {
+          html += `<div class="section-title" style="margin-top: 4px;">Tool calls (live · click to expand)</div>`;
+          html += `<div class="tools-stream">`;
+          const recent = s.tools.slice().reverse().slice(0, 40);
+          for (const t of recent) {
+            const cls = t.status === "running" ? "running" : (t.ok === false ? "err" : "ok");
+            const exp = t.expanded ? "expanded" : "";
+            const dur = t.finishedAt ? fmtElapsed(t.finishedAt - t.startedAt)
+                      : (t.status === "running" ? fmtElapsed(Date.now() - t.startedAt) : "");
+            const meta = t.status === "running"
+              ? `<div class="spinner"></div>`
+              : (t.ok === false
+                  ? `<span class="pill bad">failed</span>`
+                  : `<span class="pill good">${t.rows != null ? t.rows + " rows" : "ok"}</span>`);
+            html += `
+              <div class="tool-card ${cls} ${exp}" data-tid="${escape(t.id)}"
+                   style="border-left-color: ${colorFor(t.tool)};">
+                <div class="tool-icon">${iconFor(t.tool)}</div>
+                <div class="tool-body">
+                  <div class="tool-name">${escape(t.tool)}${dur ? `<span class="dur">${dur}</span>` : ""}</div>
+                  <div class="tool-args" title="${escape(fmtArgs(t.args))}">${escape(fmtArgs(t.args))}</div>
+                </div>
+                <div class="tool-meta">${meta}</div>
+                <div class="expand-row">
+                  <div class="kv">${escape(fmtArgsPretty(t.args))}</div>
+                </div>
+              </div>`;
+          }
+          html += `</div>`;
+        }
+
+        if (s.finalError) {
+          html += `
+            <div class="card" style="border-color: color-mix(in srgb, var(--bad) 40%, transparent); background: color-mix(in srgb, var(--bad) 5%, var(--panel-solid));">
+              <h3 style="color: var(--bad);">Error</h3>
+              <pre style="white-space: pre-wrap; word-break: break-word; margin: 0;
+                font-family: 'JetBrains Mono', ui-monospace, monospace;
+                font-size: 12.5px; color: var(--text);">${escape(s.finalError)}</pre>
+              ${s.finalErrorWhere ? `<div style="margin-top: 8px; color: var(--muted); font-size: 12px;">where: ${escape(s.finalErrorWhere)}</div>` : ""}
+            </div>`;
+        }
+
+        if (s.finalRca) { html += renderRcaHtml(s.finalRca); }
+
+        report.innerHTML = html;
+
+        report.querySelectorAll(".tool-card").forEach(el => {
+          el.addEventListener("click", () => {
+            const id = el.getAttribute("data-tid");
+            const t = (runState && runState.tools.find(x => x.id === id));
+            if (t) { t.expanded = !t.expanded; renderLive(); }
+          });
+        });
+
+        report.querySelectorAll(".view-toggle button").forEach(b => {
+          b.addEventListener("click", () => setViewMode(b.getAttribute("data-view")));
+        });
+
+        report.querySelectorAll(".probe-btn").forEach(b => {
+          b.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const idx = parseInt(b.getAttribute("data-action-idx"), 10);
+            if (!isNaN(idx)) runProbe(idx);
+          });
+        });
+      }
+
+      function setPhase(key, state) {
+        if (!runState) return;
+        if (state === "active" && runState.activePhase && runState.activePhase !== key) {
+          if (runState.phases[runState.activePhase] === "active") {
+            runState.phases[runState.activePhase] = "done";
+          }
+        }
+        runState.phases[key] = state;
+        if (state === "active") runState.activePhase = key;
+      }
+
+      // =================================================================
+      // VERDICT META
+      // =================================================================
+      const VERDICT_META = {
+        root_cause_found: {
+          eyebrow: "Root cause found",
+          heading: "We're confident on the cause.",
+          icon: "✅",
+        },
+        needs_ui_verification: {
+          eyebrow: "Likely a platform-UI issue",
+          heading: "The data is healthy — please check the dashboard.",
+          icon: "👀",
+        },
+        needs_deeper_probe: {
+          eyebrow: "Inconclusive — opt-in probes proposed",
+          heading: "We've ruled out the obvious. Deeper checks need your go-ahead.",
+          icon: "🔬",
+        },
+        inconclusive: {
+          eyebrow: "Inconclusive",
+          heading: "We couldn't pin this down with the available signals.",
+          icon: "❔",
+        },
+      };
+
+      const ACTION_META = {
+        human_verify_ui: { icon: "👀", label: "Verify on platform" },
+        run_deep_probe:  { icon: "🔬", label: "Deep probe" },
+        review_pr:       { icon: "🔀", label: "Review PR" },
+        manual_fix:      { icon: "🛠",  label: "Manual fix" },
+        info:            { icon: "ℹ️",  label: "Note" },
+      };
+
+      // =================================================================
+      // RENDER — final RCA
+      // =================================================================
+      function renderRcaHtml(rca) {
+        const verdict = rca.verdict_kind || "inconclusive";
+        const vmeta = VERDICT_META[verdict] || VERDICT_META.inconclusive;
+        const summaryBiz  = rca.summary_business  || "";
+        const summaryTech = rca.summary_technical || rca.summary || "";
+        const isBiz = viewMode === "business";
+
+        let html = "";
+
+        // ---- Verdict banner ----
+        html += `
+          <div class="verdict kind-${escape(verdict)}">
+            <div class="v-eyebrow">${vmeta.icon} ${escape(vmeta.eyebrow)}</div>
+            <h2>${escape(isBiz && summaryBiz ? summaryBiz : vmeta.heading)}</h2>
+            ${(!isBiz || !summaryBiz) ? `<p>${escape(summaryTech || rca.summary || "")}</p>` : ""}
+            <div class="v-meta">
+              ${rca.target_platform ? `${escape(rca.target_platform)} · ` : ""}
+              ${rca.target_module ? `${escape(rca.target_module)} · ` : ""}
+              run <code>${escape(rca.run_id || "")}</code>
+            </div>
+          </div>`;
+
+        // ---- View toggle ----
+        html += `
+          <div class="view-bar">
+            <div class="view-toggle" role="tablist">
+              <button data-view="business"  class="${isBiz ? "active" : ""}">👋 Business</button>
+              <button data-view="technical" class="${!isBiz ? "active" : ""}">⚙️ Technical</button>
+            </div>
+            <div class="audience-hint">
+              ${isBiz ? "Plain-English view for non-engineers." : "Full investigation details for engineers."}
+            </div>
+          </div>`;
+
+        // ---- Next actions ----
+        const actions = (rca.next_actions || []).filter(a => {
+          const aud = a.audience || "both";
+          if (aud === "both") return true;
+          return isBiz ? aud === "business" : aud === "technical";
+        });
+        if (actions.length) {
+          html += `<div class="section-title" style="margin-top: 0;">What to do next</div>`;
+          html += `<div class="actions">`;
+          actions.forEach((a, idx) => {
+            const meta = ACTION_META[a.kind] || ACTION_META.info;
+            const cls = "k-" + (a.kind || "info");
+            const audTag = a.audience && a.audience !== "both"
+              ? `<span class="audience-tag">${escape(a.audience)}</span>` : "";
+
+            let probeRow = "";
+            let resultBlock = "";
+            if (a.suggested_tool) {
+              const probeState = probeResults[idx] || { state: "idle" };
+              const btnLabel = probeState.state === "running" ? "Running…"
+                              : probeState.state === "ok"      ? "Re-run probe"
+                              : probeState.state === "err"     ? "Try again"
+                              : "Run this probe";
+              probeRow = `
+                <div class="probe-row">
+                  <span class="probe-tool">${escape(a.suggested_tool)}</span>
+                  <button class="btn-sm probe-btn" data-action-idx="${idx}" ${probeState.state === "running" ? "disabled" : ""}>
+                    ${probeState.state === "running" ? `<div class="spinner" style="border-color: rgba(255,255,255,0.4); border-top-color: white;"></div>` : "▶"}
+                    ${escape(btnLabel)}
+                  </button>
+                </div>`;
+              if (probeState.state === "ok" || probeState.state === "err") {
+                const resCls = probeState.state === "ok" ? "ok" : "err";
+                let resText = "";
+                try { resText = JSON.stringify(probeState.result, null, 2); }
+                catch (_) { resText = String(probeState.result); }
+                if (resText.length > 8000) resText = resText.slice(0, 8000) + "\n… [truncated]";
+                resultBlock = `<div class="probe-result ${resCls}">${escape(resText)}</div>`;
+              }
+            }
+
+            html += `
+              <div class="action ${cls}">
+                <div class="action-icon">${meta.icon}</div>
+                <div>
+                  <h4>${escape(a.title || meta.label)} ${audTag}</h4>
+                  ${a.detail ? `<p>${escape(a.detail)}</p>` : ""}
+                  ${probeRow}
+                  ${resultBlock}
+                </div>
+              </div>`;
+          });
+          html += `</div>`;
+        }
+
+        // ---- PR card (always visible) ----
+        if (rca.fix && rca.fix.kind && rca.fix.kind !== "none") {
+          html += `<div class="card">
+            <div class="section-title" style="margin-top: 0;">Proposed fix</div>
+            <h3>${escape(rca.fix.kind)} <span style="color: var(--muted); font-weight: 500;">(${(rca.fix.confidence * 100).toFixed(0)}% confidence)</span></h3>
+            <div style="margin-bottom: 8px; color: var(--text-2);">${escape(rca.fix.rationale || "")}</div>
+            ${rca.pr_url
+              ? `<a href="${escape(rca.pr_url)}" target="_blank">→ Draft PR ${escape(rca.pr_url)}</a>`
+              : (isBiz
+                  ? `<div style="color: var(--muted); font-size: 13px;">A code fix is prepared. An engineer will review the diff.</div>`
+                  : `<pre style="background: var(--code-bg); padding: 12px; border-radius: 10px; overflow-x: auto;"><code>${escape(rca.fix.diff || "")}</code></pre>`)}
+          </div>`;
+        }
+
+        // ---- Business view ends here — everything below is technical ----
+        if (isBiz) {
+          if ((rca.investigation_plan || []).length || (rca.investigation_checklist || []).length) {
+            html += `<details><summary>Show technical details</summary>
+              <div style="margin-top: 12px; color: var(--muted); font-size: 13px;">
+                Switch to the <strong>Technical</strong> view above for the full investigation,
+                chain of custody, evidence, and ruled-out hypotheses.
+              </div>
+            </details>`;
+          }
+          return html;
+        }
+
+        // ============ TECHNICAL VIEW ============
+
+        // ---- Top hypothesis (technical) ----
         const top = (rca.hypotheses || [])
           .filter(h => h.status === "supported")
           .sort((a, b) => b.confidence - a.confidence)[0];
         const ruled = (rca.hypotheses || []).filter(h => h.status === "ruled_out");
-
         const evMap = {};
         (rca.evidence || []).forEach(e => evMap[e.id] = e);
-
-        let html = "";
-        html += `
-          <div class="card">
-            <div class="row" style="justify-content: space-between;">
-              <div>
-                <div class="section-title" style="margin-top: 0;">Summary</div>
-                <h3 style="margin: 0;">${escape(rca.summary || "(no summary)")}</h3>
-              </div>
-              <div class="row">
-                ${rca.target_platform
-                    ? `<span class="pill">${escape(rca.target_platform)}</span>` : ""}
-                ${rca.target_module
-                    ? `<span class="pill">${escape(rca.target_module)}</span>` : ""}
-              </div>
-            </div>
-          </div>`;
 
         if (top) {
           html += `
@@ -211,14 +1291,34 @@
                 </div>
                 <span class="pill">${(top.confidence * 100).toFixed(0)}% confidence</span>
               </div>
-              <div>${escape(top.explanation)}</div>
-              <div style="margin-top: 8px;">
+              <div style="color: var(--text-2);">${escape(top.explanation)}</div>
+              <div style="margin-top: 10px;">
                 ${(top.evidence_ids || []).map(eid =>
                     `<span class="tag" title="${escape((evMap[eid] || {}).summary || '')}">${eid}</span>`).join("")}
               </div>
             </div>`;
         }
 
+        // ---- Investigation plan ----
+        if ((rca.investigation_plan || []).length) {
+          html += `<div class="card">
+            <div class="section-title" style="margin-top: 0;">Investigation plan</div>
+            <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">
+              What the agent decided to check vs. skip, and why.
+            </div>
+            <div class="plan-grid">`;
+          rca.investigation_plan.forEach(p => {
+            const ck = p.will_check === false ? "skipped" : "checked";
+            html += `<div class="plan-item ${ck}">
+              <div class="plan-layer">${escape(p.layer)}</div>
+              <div class="plan-desc">${escape(p.description || "")}</div>
+              ${p.reason ? `<div class="plan-reason">${escape(p.reason)}</div>` : ""}
+            </div>`;
+          });
+          html += `</div></div>`;
+        }
+
+        // ---- Chain of custody ----
         if ((rca.chain_of_custody || []).length) {
           html += `<div class="card">
             <div class="section-title" style="margin-top: 0;">Chain of custody</div>
@@ -235,8 +1335,7 @@
         }
 
         if ((rca.investigation_checklist || []).length) {
-          html += `<details open><summary>Investigation checklist
-              (${rca.investigation_checklist.length} checks)</summary>
+          html += `<details open><summary>Investigation checklist (${rca.investigation_checklist.length} checks)</summary>
             <table style="margin-top: 10px;">
               <thead><tr><th>Check</th><th>Status</th><th>Finding</th></tr></thead><tbody>`;
           rca.investigation_checklist.forEach(c => {
@@ -254,8 +1353,7 @@
             <table style="margin-top: 10px;">
               <thead><tr><th>Hypothesis</th><th>Why dismissed</th></tr></thead><tbody>`;
           ruled.forEach(h => {
-            html += `<tr><td>${escape(h.title)}</td>
-              <td>${escape(h.rule_out_reason || "—")}</td></tr>`;
+            html += `<tr><td>${escape(h.title)}</td><td>${escape(h.rule_out_reason || "—")}</td></tr>`;
           });
           html += "</tbody></table></details>";
         }
@@ -275,87 +1373,202 @@
           html += "</tbody></table></details>";
         }
 
-        if (rca.fix && rca.fix.kind && rca.fix.kind !== "none") {
-          html += `<div class="card">
-            <div class="section-title" style="margin-top: 0;">Proposed fix</div>
-            <h3>${escape(rca.fix.kind)} (${(rca.fix.confidence * 100).toFixed(0)}% confidence)</h3>
-            <div style="margin-bottom: 8px;">${escape(rca.fix.rationale || "")}</div>
-            ${rca.pr_url
-              ? `<a href="${escape(rca.pr_url)}" target="_blank">→ Draft PR ${escape(rca.pr_url)}</a>`
-              : `<pre style="background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto;"><code>${escape(rca.fix.diff || "")}</code></pre>`}
-          </div>`;
+        return html;
+      }
+
+      // =================================================================
+      // PROBE EXECUTION
+      // =================================================================
+      async function runProbe(actionIdx) {
+        if (!runState || !runState.finalRca) return;
+        const action = (runState.finalRca.next_actions || [])[actionIdx];
+        if (!action || !action.suggested_tool) return;
+        const runId = runState.runId || runState.finalRca.run_id;
+        if (!runId) return;
+
+        probeResults[actionIdx] = { state: "running", result: null };
+        renderLive();
+
+        try {
+          const resp = await fetch("/rca/probe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              run_id: runId,
+              tool: action.suggested_tool,
+              args: action.suggested_args || {},
+            }),
+          });
+          const data = await resp.json();
+          probeResults[actionIdx] = {
+            state: data.ok ? "ok" : "err",
+            result: data.ok ? data.result : (data.error || data.result || data),
+          };
+        } catch (e) {
+          probeResults[actionIdx] = { state: "err", result: String(e) };
         }
-
-        report.innerHTML = html;
+        renderLive();
       }
 
-      function escape(s) {
-        return String(s == null ? "" : s)
-          .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-      }
+      // =================================================================
+      // RUN ID COPY
+      // =================================================================
+      const runIdEl = $("#run-id");
+      runIdEl.addEventListener("click", async () => {
+        const txt = runIdEl.textContent.trim();
+        if (!txt || txt === "—") return;
+        try {
+          await navigator.clipboard.writeText(txt);
+          const orig = runIdEl.textContent;
+          runIdEl.classList.add("copied");
+          runIdEl.textContent = "copied ✓";
+          setTimeout(() => { runIdEl.textContent = orig; runIdEl.classList.remove("copied"); }, 900);
+        } catch (_) {}
+      });
 
-      $("#run-btn").addEventListener("click", () => {
+      // =================================================================
+      // PREFLIGHT
+      // =================================================================
+      async function runPreflight() {
+        try {
+          const r = await fetch("/preflight");
+          const j = await r.json();
+          const issues = j.issues || [];
+          if (!issues.length) { preflightBanner = ""; }
+          else {
+            const hasError = issues.some(i => i.severity === "error");
+            preflightBanner = `
+              <div class="banner ${hasError ? 'error' : ''}">
+                <div class="banner-icon">${hasError ? '⚠️' : 'ℹ️'}</div>
+                <div style="flex: 1;">
+                  <strong>${hasError ? "Setup not complete" : "Heads up"}</strong>
+                  <ul>
+                    ${issues.map(i => `<li class="${escape(i.severity)}">${escape(i.message)}</li>`).join("")}
+                  </ul>
+                  <div class="footnote">Edit <code>.env</code> in the project root and restart the server.</div>
+                </div>
+              </div>`;
+          }
+        } catch (_) { preflightBanner = ""; }
+        if (!runState) renderEmpty();
+      }
+      runPreflight();
+      renderEmpty();
+
+      // =================================================================
+      // RUN
+      // =================================================================
+      function startRun() {
         const url = $("#slack-url").value.trim();
         if (!url) { alert("Paste a Slack message link first."); return; }
+
         clearLog();
+        runState = freshState();
+        probeResults = {};
+        runState.activeStatus = "Starting";
+        setPhase("fetch", "active");
+        renderLive();
+        startElapsedTicker();
         setStatus("running", "warn");
         appendLog("→ starting investigation", "start");
 
-        const es = new EventSource(
-          "/rca/stream?slack_url=" + encodeURIComponent(url));
+        const es = new EventSource("/rca/stream?slack_url=" + encodeURIComponent(url));
 
         es.addEventListener("status", (e) => {
           const d = JSON.parse(e.data);
-          appendLog("• " + (d.payload && d.payload.message ? d.payload.message : "—"),
-            "muted");
-          $("#run-id").textContent = d.run_id || "—";
+          const msg = (d.payload && d.payload.message) || "—";
+          runState.activeStatus = msg;
+          if (d.run_id) runState.runId = d.run_id;
+          const ph = classifyPhase(msg);
+          if (ph) setPhase(ph, "active");
+          const m = (msg || "").match(/tool budget:\s*(\d+)/i);
+          if (m) runState.budgetLeft = parseInt(m[1], 10);
+          runIdEl.textContent = d.run_id || "—";
+          appendLog("• " + msg, "muted");
+          renderLive();
         });
         es.addEventListener("issue_extracted", (e) => {
           const d = JSON.parse(e.data);
           const i = d.payload.issue || {};
-          appendLog(`✓ issue: ${i.platform || "?"} / ${i.module || "?"} — ${i.intent || "other"}`,
-            "ok");
+          setPhase("issue", "done"); setPhase("invest", "active");
+          runState.activeStatus = `Issue: ${i.platform || "?"} / ${i.module || "?"} — ${i.intent || "other"}`;
+          appendLog(`✓ issue: ${i.platform || "?"} / ${i.module || "?"} — ${i.intent || "other"}`, "ok");
+          renderLive();
         });
         es.addEventListener("tool_call_started", (e) => {
           const d = JSON.parse(e.data);
-          appendLog(`→ ${d.payload.tool}  ${fmtArgs(d.payload.args)}`, "start");
+          const tool = d.payload.tool;
+          const tu_id = d.payload.tool_use_id || (tool + ":" + Date.now() + Math.random());
+          runState.tools.push({
+            id: tu_id, tool, args: d.payload.args, status: "running",
+            ok: null, rows: null, startedAt: Date.now(), finishedAt: null, expanded: false,
+          });
+          runState.toolCount++;
+          const ph = phaseForTool(tool); if (ph) setPhase(ph, "active");
+          runState.activeStatus = `Running ${tool}`;
+          appendLog(`→ ${tool}  ${fmtArgs(d.payload.args)}`, "start");
+          renderLive();
         });
         es.addEventListener("tool_call_finished", (e) => {
           const d = JSON.parse(e.data);
-          const ok = d.payload.ok ? "ok" : "err";
-          const rows = d.payload.rows != null ? `(${d.payload.rows} rows)` : "";
-          appendLog(`${d.payload.ok ? "✓" : "✗"} ${d.payload.tool} ${rows}`, ok);
+          const ok = !!d.payload.ok; const rows = d.payload.rows;
+          for (let i = runState.tools.length - 1; i >= 0; i--) {
+            const t = runState.tools[i];
+            if (t.tool === d.payload.tool && t.status === "running") {
+              t.status = "done"; t.ok = ok; t.rows = rows; t.finishedAt = Date.now();
+              break;
+            }
+          }
+          if (ok) runState.toolOkCount++; else runState.toolFailCount++;
+          appendLog(`${ok ? "✓" : "✗"} ${d.payload.tool} ${rows != null ? "(" + rows + " rows)" : ""}`,
+            ok ? "ok" : "err");
+          renderLive();
+        });
+        es.addEventListener("pr_opened", (e) => {
+          const d = JSON.parse(e.data);
+          runState.activeStatus = `Opened draft PR #${d.payload.number}`;
+          appendLog(`✓ draft PR opened: ${d.payload.pr_url}`, "ok");
+          renderLive();
         });
         es.addEventListener("rca_complete", (e) => {
           const d = JSON.parse(e.data);
-          renderRca(d.payload.rca);
+          runState.finalRca = d.payload.rca; runState.done = true;
+          setPhase("submit", "done"); setPhase("post", "done");
+          runState.activeStatus = "RCA complete";
           setStatus("complete", "good");
           appendLog("✓ RCA complete", "ok");
+          renderLive();
           es.close();
         });
         es.addEventListener("error", (e) => {
-          try {
-            const d = JSON.parse(e.data || "{}");
-            appendLog("✗ " + (d.payload && d.payload.error ? d.payload.error : "error"),
-              "err");
-          } catch (_) {
-            appendLog("✗ stream error", "err");
-          }
+          let payload = {};
+          try { payload = JSON.parse(e.data || "{}").payload || {}; } catch (_) {}
+          const errMsg = payload.error || "Stream error (check server logs).";
+          runState.finalError = errMsg;
+          runState.finalErrorWhere = payload.where || null;
+          runState.done = true;
+          if (runState.activePhase) setPhase(runState.activePhase, "error");
           setStatus("error", "bad");
+          appendLog("✗ " + errMsg, "err");
+          renderLive();
           es.close();
         });
-        es.addEventListener("end", () => {
-          es.close();
-        });
-      });
+        es.addEventListener("end", () => { es.close(); });
+      }
+
+      $("#run-btn").addEventListener("click", startRun);
+      $("#slack-url").addEventListener("keydown", (e) => { if (e.key === "Enter") startRun(); });
 
       $("#reset-btn").addEventListener("click", () => {
         $("#slack-url").value = "";
         clearLog();
-        report.innerHTML = '<div class="empty">Ready.</div>';
+        runState = null;
+        probeResults = {};
+        if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+        elapsedEl.textContent = "—";
         setStatus("idle");
-        $("#run-id").textContent = "—";
+        runIdEl.textContent = "—";
+        runPreflight();
       });
     </script>
   </body>

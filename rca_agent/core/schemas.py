@@ -209,6 +209,75 @@ class FixProposal(BaseModel):
     confidence: float = 0.0
 
 
+# ---------- Verdict + next-action machinery ----------
+
+class VerdictKind(str, Enum):
+    ROOT_CAUSE_FOUND = "root_cause_found"
+    """Confident root cause supported by ≥2 evidence items."""
+
+    NEEDS_UI_VERIFICATION = "needs_ui_verification"
+    """Data + code layers look healthy; the symptom is most likely downstream of the scraping
+    pipeline. Ask the human to check the platform UI before going deeper."""
+
+    NEEDS_DEEPER_PROBE = "needs_deeper_probe"
+    """Standard checks are inconclusive. The agent proposes one or more opt-in deep probes
+    (e.g. re-scrape a single URL, pull recent S3 artifacts) for the human to run."""
+
+    INCONCLUSIVE = "inconclusive"
+    """Genuinely unknown; budget exhausted with no useful next probe."""
+
+
+class NextActionKind(str, Enum):
+    HUMAN_VERIFY_UI = "human_verify_ui"
+    """The human should open the platform dashboard and confirm what they see."""
+
+    RUN_DEEP_PROBE = "run_deep_probe"
+    """A pre-baked tool call the human can opt to run from the UI."""
+
+    REVIEW_PR = "review_pr"
+    """Review the auto-opened draft PR."""
+
+    MANUAL_FIX = "manual_fix"
+    """A fix that doesn't fall into the 4 recipe kinds — copy/paste instructions."""
+
+    INFO = "info"
+    """Informational note, no action required."""
+
+
+class NextAction(BaseModel):
+    """Something a human can / should do after reading the RCA.
+
+    Some are pre-baked tool calls the UI can fire via /rca/probe (`suggested_tool` + `suggested_args`).
+    Others are pure instructions (`detail`).
+    """
+    kind: NextActionKind
+    title: str = Field(..., description="Short label, e.g. 'Verify on Blinkit dashboard'.")
+    detail: str = Field("", description="Longer human-readable instruction.")
+    audience: Literal["business", "technical", "both"] = "both"
+    suggested_tool: Optional[str] = Field(
+        default=None,
+        description="If set, the UI shows a 'Run this probe' button that calls this tool.",
+    )
+    suggested_args: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Pre-baked args to send to the tool when the human approves.",
+    )
+
+
+class InvestigationPlanItem(BaseModel):
+    """One thing the agent intends to (or did) check, with its rationale."""
+    layer: Literal[
+        "registry", "snowflake", "postgres", "s3", "temporal",
+        "spider_code", "git_history", "github_prs", "other",
+    ]
+    description: str
+    will_check: bool = Field(
+        default=True,
+        description="False if the agent decided this layer is irrelevant to the symptom.",
+    )
+    reason: str = Field(default="", description="Why the agent included or skipped this layer.")
+
+
 class RcaReport(BaseModel):
     issue: Issue
     target_platform: Optional[str] = None
@@ -216,7 +285,46 @@ class RcaReport(BaseModel):
     target_runner: Optional[str] = Field(
         default=None, description="Module path of the runner config (e.g. runners.blinkit.search)."
     )
-    summary: str = Field(..., description="2-3 sentence executive summary.")
+
+    # ---- Dual-audience summaries ----
+    summary: str = Field(
+        ...,
+        description=(
+            "Primary executive summary (technical). Kept for backwards compatibility — "
+            "mirrors summary_technical if set."
+        ),
+    )
+    summary_business: str = Field(
+        default="",
+        description=(
+            "Plain-English summary for non-technical users (PM / ops / business). "
+            "No table names, no SQL, no file paths. One or two sentences."
+        ),
+    )
+    summary_technical: str = Field(
+        default="",
+        description=(
+            "Technical summary for engineers. 2-4 sentences citing specific tables, columns, "
+            "queries, file:line refs, and PR numbers."
+        ),
+    )
+
+    # ---- Verdict & action machinery ----
+    verdict_kind: VerdictKind = Field(
+        default=VerdictKind.INCONCLUSIVE,
+        description="What kind of conclusion the agent reached — drives the UI banner.",
+    )
+    next_actions: list[NextAction] = Field(
+        default_factory=list,
+        description="Concrete things a human can / should do next. Some are runnable deep probes.",
+    )
+    investigation_plan: list[InvestigationPlanItem] = Field(
+        default_factory=list,
+        description="The triage plan the agent set up before / during the investigation. "
+                    "Used by the UI to explain *why* certain layers were skipped.",
+    )
+
+    # ---- Findings ----
     evidence: list[Evidence] = Field(default_factory=list)
     chain_of_custody: list[ChainOfCustodyHop] = Field(
         default_factory=list,

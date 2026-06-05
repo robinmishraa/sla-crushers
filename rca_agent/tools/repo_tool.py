@@ -32,9 +32,17 @@ _DEFAULT_INCLUDE_DIRS = [
 _MAX_FILE_BYTES = 200_000  # 200 KB read cap per file
 
 
+def _scraping_root() -> Path:
+    try:
+        return settings().require_scraping_repo()
+    except RuntimeError as e:
+        raise ToolError(str(e)) from e
+
+
 def _resolve_in_repo(rel: str) -> Path:
-    p = (settings().SCRAPING_REPO_ROOT / rel).resolve()
-    repo = settings().SCRAPING_REPO_ROOT.resolve()
+    root = _scraping_root()
+    p = (root / rel).resolve()
+    repo = root.resolve()
     if not str(p).startswith(str(repo)):
         raise ToolError(f"Path escapes scraping repo: {rel}")
     return p
@@ -76,7 +84,7 @@ class RepoSearchTool(BaseTool):
         if args.get("path"):
             targets = [str(_resolve_in_repo(args["path"]))]
         else:
-            scraping_root = settings().SCRAPING_REPO_ROOT
+            scraping_root = _scraping_root()
             targets = [
                 str(_resolve_in_repo(d))
                 for d in _DEFAULT_INCLUDE_DIRS
@@ -86,7 +94,7 @@ class RepoSearchTool(BaseTool):
         try:
             out = subprocess.run(
                 cmd,
-                cwd=str(settings().SCRAPING_REPO_ROOT),
+                cwd=str(_scraping_root()),
                 capture_output=True,
                 text=True,
                 timeout=20,
@@ -98,13 +106,14 @@ class RepoSearchTool(BaseTool):
             raise ToolError(f"ripgrep failed: {out.stderr[:500]}")
 
         hits: list[dict[str, Any]] = []
+        root_resolved = _scraping_root().resolve()
         for line in (out.stdout or "").splitlines():
             try:
                 file_part, line_part, match_part = line.split(":", 2)
             except ValueError:
                 continue
             try:
-                rel = str(Path(file_part).resolve().relative_to(settings().SCRAPING_REPO_ROOT.resolve()))
+                rel = str(Path(file_part).resolve().relative_to(root_resolved))
             except ValueError:
                 rel = file_part
             hits.append({"file": rel, "line": int(line_part), "match": match_part.rstrip()})

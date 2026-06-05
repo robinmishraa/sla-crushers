@@ -14,7 +14,11 @@ from rca_agent.tools.base import BaseTool, ToolError
 
 
 def _git(*args: str, max_bytes: int = 200_000) -> str:
-    cmd = ["git", "-C", str(settings().SCRAPING_REPO_ROOT), *args]
+    try:
+        repo_root = settings().require_scraping_repo()
+    except RuntimeError as e:
+        raise ToolError(str(e)) from e
+    cmd = ["git", "-C", str(repo_root), *args]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
     except FileNotFoundError as e:

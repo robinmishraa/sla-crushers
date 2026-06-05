@@ -32,11 +32,22 @@ def _load_registry():
     import os
     from rca_agent.core.settings import settings as _s
 
+    try:
+        scraping_root = _s().require_scraping_repo()
+    except RuntimeError as e:
+        raise ToolError(str(e)) from e
+
     cwd_before = os.getcwd()
     try:
-        os.chdir(_s().SCRAPING_REPO_ROOT)
+        os.chdir(scraping_root)
         from temporal_v2.registry import REGISTRY  # noqa: WPS433
         from temporal_v2.contracts import Platform, Module  # noqa: WPS433
+    except ImportError as e:
+        raise ToolError(
+            f"Could not import temporal_v2.registry from {scraping_root}. "
+            "Make sure SCRAPING_REPO_ROOT points at a valid clone of the scraping repo "
+            f"and that all its runtime deps are installed. Underlying error: {e}"
+        ) from e
     finally:
         os.chdir(cwd_before)
     _REGISTRY_CACHE = (REGISTRY, Platform, Module)

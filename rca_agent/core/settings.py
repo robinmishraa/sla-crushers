@@ -21,7 +21,13 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 def _get(name: str, default: str | None = None) -> str | None:
     val = os.getenv(name, default)
-    return val if val not in (None, "") else None
+    if val in (None, ""):
+        return None
+    # Treat .env.example placeholders (e.g. "xoxb-...", "sk-ant-...", "pk_...", "ghp_...")
+    # as unset so fallbacks (like SLACK_ANALYTICS_TOKEN) kick in.
+    if isinstance(val, str) and val.endswith("..."):
+        return None
+    return val
 
 
 def _get_int(name: str, default: int) -> int:
@@ -44,37 +50,39 @@ def _get_float(name: str, default: float) -> float:
         return default
 
 
-def _resolve_scraping_repo() -> Path:
-    """Find the local scraping repo clone."""
+def _resolve_scraping_repo() -> Path | None:
+    """Find the local scraping repo clone.
+
+    Returns None (rather than raising) when the path is missing or invalid.
+    Tools that genuinely need the scraping repo will report the situation at
+    call time. This lets the FastAPI app boot and the UI render even if .env
+    is half-configured — useful for hackathon demos.
+    """
     raw = _get("SCRAPING_REPO_ROOT")
     if raw:
         p = Path(raw).expanduser().resolve()
-        if not p.exists():
-            raise RuntimeError(
-                f"SCRAPING_REPO_ROOT={raw!r} does not exist. "
-                "Point this env var at your local clone of the scraping repo."
-            )
-        return p
+        if p.exists():
+            return p
+        return None
     # Heuristic default: sibling directory named 'scraping'
     candidate = (PROJECT_ROOT.parent / "scraping").resolve()
     if candidate.exists() and (candidate / "common" / "config.py").exists():
         return candidate
-    raise RuntimeError(
-        "Could not locate the scraping repo. Set SCRAPING_REPO_ROOT in your .env "
-        "(absolute path to your local clone of GobbleCube/scraping)."
-    )
+    return None
 
 
 class Settings:
     PROJECT_ROOT: Path = PROJECT_ROOT
-    SCRAPING_REPO_ROOT: Path
+    SCRAPING_REPO_ROOT: Path | None = None
+    SCRAPING_REPO_ROOT_RAW: str | None = _get("SCRAPING_REPO_ROOT")
 
     # LLM
     ANTHROPIC_API_KEY: str | None = _get("ANTHROPIC_API_KEY")
     LLM_MODEL: str = _get("RCA_LLM_MODEL", "claude-sonnet-4-5-20250929") or "claude-sonnet-4-5-20250929"
 
-    # Slack
-    SLACK_BOT_TOKEN: str | None = _get("SLACK_BOT_TOKEN")
+    # Slack — accept SLACK_ANALYTICS_TOKEN as a fallback for SLACK_BOT_TOKEN
+    # (the scraping repo's existing .env uses that name for the same xoxb token).
+    SLACK_BOT_TOKEN: str | None = _get("SLACK_BOT_TOKEN") or _get("SLACK_ANALYTICS_TOKEN")
     SLACK_APP_TOKEN: str | None = _get("SLACK_APP_TOKEN")
     SLACK_SIGNING_SECRET: str | None = _get("SLACK_SIGNING_SECRET")
 
@@ -98,15 +106,42 @@ class Settings:
 
     def __init__(self) -> None:
         self.SCRAPING_REPO_ROOT = _resolve_scraping_repo()
-        # Make the scraping repo importable so we can reuse:
-        #   common.config.database, temporal.resources.snowflake_client,
-        #   temporal_v2.registry, etc.
-        if str(self.SCRAPING_REPO_ROOT) not in sys.path:
-            sys.path.insert(0, str(self.SCRAPING_REPO_ROOT))
-        # Also load the scraping repo's .env so DB_*, SF_*, AWS_* vars exist.
-        load_dotenv(self.SCRAPING_REPO_ROOT / ".env")
-        # Re-load our own .env on top so project-level overrides win.
-        load_dotenv(PROJECT_ROOT / ".env", override=True)
+        if self.SCRAPING_REPO_ROOT is not None:
+            # Make the scraping repo importable so we can reuse:
+            #   common.config.database, temporal.resources.snowflake_client,
+            #   temporal_v2.registry, etc.
+            if str(self.SCRAPING_REPO_ROOT) not in sys.path:
+                sys.path.insert(0, str(self.SCRAPING_REPO_ROOT))
+            # Also load the scraping repo's .env so DB_*, SF_*, AWS_*, SLACK_ANALYTICS_TOKEN
+            # vars exist for tools that need them.
+            load_dotenv(self.SCRAPING_REPO_ROOT / ".env")
+            # Re-load our own .env on top so project-level overrides win.
+            load_dotenv(PROJECT_ROOT / ".env", override=True)
+
+        # Re-resolve any token whose value lives in the scraping repo's .env (loaded above).
+        # Class-level field declarations evaluated before __init__ ran, so SLACK_ANALYTICS_TOKEN
+        # wasn't in os.environ yet at that point.
+        slack_resolved = _get("SLACK_BOT_TOKEN") or _get("SLACK_ANALYTICS_TOKEN")
+        if slack_resolved:
+            self.SLACK_BOT_TOKEN = slack_resolved
+
+    def require_scraping_repo(self) -> Path:
+        """Raise a clean RuntimeError if the scraping repo is not configured."""
+        if self.SCRAPING_REPO_ROOT is None:
+            raw = self.SCRAPING_REPO_ROOT_RAW
+            if raw:
+                msg = (
+                    f"SCRAPING_REPO_ROOT={raw!r} does not exist on this machine. "
+                    "Edit .env in the project root and point it at your local clone of "
+                    "GobbleCube/scraping (e.g. ~/Desktop/scraping)."
+                )
+            else:
+                msg = (
+                    "SCRAPING_REPO_ROOT is not set. Edit .env in the project root and "
+                    "add an absolute path to your local clone of GobbleCube/scraping."
+                )
+            raise RuntimeError(msg)
+        return self.SCRAPING_REPO_ROOT
 
 
 @lru_cache(maxsize=1)

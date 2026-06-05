@@ -28,7 +28,7 @@ class RecipeOutput:
 
 
 def _read(path: str) -> tuple[str, list[str]]:
-    p = settings().SCRAPING_REPO_ROOT / path
+    p = settings().require_scraping_repo() / path
     if not p.exists():
         raise FileNotFoundError(f"file not found in scraping repo: {path}")
     text = p.read_text(encoding="utf-8")

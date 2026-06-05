@@ -64,7 +64,17 @@ def _maybe_inject_limit(sql: str, default_limit: int) -> str:
 
 def _get_resource():
     """Lazy import so missing env vars surface only when first used."""
-    from temporal.resources.snowflake_client import SnowflakeResource  # noqa: WPS433
+    try:
+        settings().require_scraping_repo()
+    except RuntimeError as e:
+        raise ToolError(str(e)) from e
+    try:
+        from temporal.resources.snowflake_client import SnowflakeResource  # noqa: WPS433
+    except ImportError as e:
+        raise ToolError(
+            "Could not import temporal.resources.snowflake_client from the scraping repo. "
+            f"Underlying error: {e}"
+        ) from e
     return SnowflakeResource()
 
 

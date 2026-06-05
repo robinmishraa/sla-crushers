@@ -150,7 +150,10 @@ class GithubOpenPrTool(BaseTool):
         base = args.get("base") or settings().GITHUB_BASE_BRANCH
 
         # Apply diff to a temporary branch using local git, then push.
-        repo_root = str(settings().SCRAPING_REPO_ROOT)
+        try:
+            repo_root = str(settings().require_scraping_repo())
+        except RuntimeError as e:
+            raise ToolError(str(e)) from e
         try:
             subprocess.run(["git", "-C", repo_root, "fetch", "origin", base], check=True, capture_output=True)
             subprocess.run(
