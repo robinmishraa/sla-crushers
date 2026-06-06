@@ -771,6 +771,21 @@
         <label class="stack" for="slack-url">Slack message link</label>
         <input id="slack-url" type="text"
           placeholder="https://workspace.slack.com/archives/C…/p…" />
+
+        <details id="manual-input" style="margin-top: 10px;">
+          <summary style="font-size: 12.5px; color: var(--muted); cursor: pointer; user-select: none;">
+            Bot can't read the thread? Paste it manually ▾
+          </summary>
+          <div style="margin-top: 10px;">
+            <label class="stack" for="thread-text">Thread text (one message per line is fine)</label>
+            <textarea id="thread-text" rows="6"
+              placeholder="@scraping-team blinkit search has been empty since 3pm yesterday for IN…"
+              style="resize: vertical; min-height: 90px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px;"></textarea>
+            <label class="stack" for="clickup-url" style="margin-top: 10px;">ClickUp ticket URL (optional)</label>
+            <input id="clickup-url" type="text" placeholder="https://app.clickup.com/t/…" />
+          </div>
+        </details>
+
         <div class="row" style="margin-top: 12px;">
           <button id="run-btn" class="btn">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
@@ -1461,6 +1476,8 @@
       function startRun() {
         const url = $("#slack-url").value.trim();
         if (!url) { alert("Paste a Slack message link first."); return; }
+        const threadText = ($("#thread-text") && $("#thread-text").value || "").trim();
+        const clickupUrl = ($("#clickup-url") && $("#clickup-url").value || "").trim();
 
         clearLog();
         runState = freshState();
@@ -1470,9 +1487,12 @@
         renderLive();
         startElapsedTicker();
         setStatus("running", "warn");
-        appendLog("→ starting investigation", "start");
+        appendLog("→ starting investigation" + (threadText ? " (using pasted thread)" : ""), "start");
 
-        const es = new EventSource("/rca/stream?slack_url=" + encodeURIComponent(url));
+        let qs = "/rca/stream?slack_url=" + encodeURIComponent(url);
+        if (threadText) qs += "&thread_text=" + encodeURIComponent(threadText);
+        if (clickupUrl) qs += "&clickup_url=" + encodeURIComponent(clickupUrl);
+        const es = new EventSource(qs);
 
         es.addEventListener("status", (e) => {
           const d = JSON.parse(e.data);
@@ -1561,6 +1581,8 @@
 
       $("#reset-btn").addEventListener("click", () => {
         $("#slack-url").value = "";
+        if ($("#thread-text")) $("#thread-text").value = "";
+        if ($("#clickup-url")) $("#clickup-url").value = "";
         clearLog();
         runState = null;
         probeResults = {};

@@ -101,22 +101,26 @@ class ToolCall(BaseModel):
     rows: Optional[int] = Field(default=None, description="Row count for SQL tools.")
 
 
-class EvidenceKind(str, Enum):
-    SQL_RESULT = "sql_result"
-    CODE_REFERENCE = "code_reference"
-    REGISTRY_ENTRY = "registry_entry"
-    SLACK_MESSAGE = "slack_message"
-    CLICKUP_TICKET = "clickup_ticket"
-    TEMPORAL_HISTORY = "temporal_history"
-    S3_ARTIFACT = "s3_artifact"
-    GIT_COMMIT = "git_commit"
-    GITHUB_PR = "github_pr"
+# Canonical Evidence kinds — listed for the LLM's reference, but the schema
+# accepts any string so a slightly-off label (e.g. "code_inspection") doesn't
+# tank the entire run at final validation time.
+CANONICAL_EVIDENCE_KINDS = (
+    "sql_result", "code_reference", "registry_entry", "slack_message",
+    "clickup_ticket", "temporal_history", "s3_artifact", "git_commit",
+    "github_pr", "code_inspection", "tool_unavailable", "other",
+)
 
 
 class Evidence(BaseModel):
     """A single fact the agent collected, anchored to a tool call."""
     id: str = Field(..., description="Stable id for hypothesis citations, e.g. 'E1'.")
-    kind: EvidenceKind
+    kind: str = Field(
+        ...,
+        description=(
+            "Category for grouping. Preferred values: " + ", ".join(CANONICAL_EVIDENCE_KINDS)
+            + ". Free-form strings are accepted."
+        ),
+    )
     summary: str = Field(..., description="One-line human-readable claim.")
     tool_call_id: str = Field(..., description="ID of the ToolCall that produced this.")
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -134,30 +138,38 @@ class HypothesisStatus(str, Enum):
     UNVERIFIED = "unverified"
 
 
+# Canonical Hypothesis categories — listed for the LLM's reference, but the
+# schema accepts any string so a slightly-off label (e.g. "platform_ui_issue")
+# doesn't tank the entire run at final validation time.
+CANONICAL_HYPOTHESIS_CATEGORIES = (
+    "selector_drift", "header_or_cookie", "pincode_or_location", "url_pattern",
+    "upstream_schema_change", "rate_limit_or_block", "infra_or_pipeline",
+    "data_pipeline_lag", "input_data_issue", "code_regression", "config_change",
+    "platform_ui_issue", "other",
+)
+
+
 class Hypothesis(BaseModel):
     title: str
     explanation: str = Field(..., description="Plain English root cause.")
     confidence: float = Field(..., ge=0.0, le=1.0)
-    status: HypothesisStatus = HypothesisStatus.UNVERIFIED
+    status: str = Field(
+        default="unverified",
+        description="One of: supported, ruled_out, unverified. Other strings are accepted.",
+    )
     evidence_ids: list[str] = Field(default_factory=list)
     rule_out_reason: Optional[str] = Field(
         default=None,
         description="Required when status == RULED_OUT; explains which evidence killed it.",
     )
-    category: Literal[
-        "selector_drift",
-        "header_or_cookie",
-        "pincode_or_location",
-        "url_pattern",
-        "upstream_schema_change",
-        "rate_limit_or_block",
-        "infra_or_pipeline",
-        "data_pipeline_lag",
-        "input_data_issue",
-        "code_regression",
-        "config_change",
-        "other",
-    ] = "other"
+    category: str = Field(
+        default="other",
+        description=(
+            "Hypothesis category. Preferred values: "
+            + ", ".join(CANONICAL_HYPOTHESIS_CATEGORIES)
+            + ". Free-form strings are accepted."
+        ),
+    )
 
 
 class ChecklistStatus(str, Enum):
@@ -171,19 +183,30 @@ class ChecklistStatus(str, Enum):
 class ChecklistItem(BaseModel):
     """One concrete thing the agent verified.
 
-    The list of checks below IS the 'I checked every damn thing' deliverable.
-    A demo-quality RCA includes ~15-20 of these, not 3.
+    Lean is fine — three sharp checks beat fifteen filler ones.
     """
     key: str = Field(..., description="Stable id, e.g. 'sf_recent_rows'.")
     label: str = Field(..., description="Human-readable name of the check.")
-    status: ChecklistStatus
+    status: str = Field(
+        default="not_run",
+        description="One of: passed, failed, inconclusive, skipped, not_run. Free-form strings are accepted.",
+    )
     finding: str = Field(default="", description="One-line result of the check.")
     evidence_ids: list[str] = Field(default_factory=list)
 
 
+CANONICAL_CHAIN_LAYERS = (
+    "temporal_run", "s3_raw", "postgres", "snowflake", "report",
+    "spider_code", "platform_ui", "other",
+)
+
+
 class ChainOfCustodyHop(BaseModel):
     """Tracks data through the pipeline: spider -> S3 -> Postgres -> Snowflake."""
-    layer: Literal["temporal_run", "s3_raw", "postgres", "snowflake", "report"]
+    layer: str = Field(
+        ...,
+        description="Pipeline layer label. Preferred: " + ", ".join(CANONICAL_CHAIN_LAYERS),
+    )
     expected: str = Field(..., description="What we expected at this layer.")
     observed: str = Field(..., description="What we actually saw.")
     healthy: bool
@@ -264,12 +287,18 @@ class NextAction(BaseModel):
     )
 
 
+CANONICAL_PLAN_LAYERS = (
+    "registry", "snowflake", "postgres", "s3", "temporal",
+    "spider_code", "git_history", "github_prs", "platform_ui", "other",
+)
+
+
 class InvestigationPlanItem(BaseModel):
     """One thing the agent intends to (or did) check, with its rationale."""
-    layer: Literal[
-        "registry", "snowflake", "postgres", "s3", "temporal",
-        "spider_code", "git_history", "github_prs", "other",
-    ]
+    layer: str = Field(
+        ...,
+        description="Pipeline layer. Preferred: " + ", ".join(CANONICAL_PLAN_LAYERS),
+    )
     description: str
     will_check: bool = Field(
         default=True,

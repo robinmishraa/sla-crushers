@@ -42,7 +42,11 @@ def _emit(run_id: str, event: dict[str, Any]) -> None:
             _run_done[run_id] = True
 
 
-def _kickoff_async(slack_url: str) -> str:
+def _kickoff_async(
+    slack_url: str,
+    thread_text: str | None = None,
+    clickup_url: str | None = None,
+) -> str:
     """Start an RCA run in a background thread; return the run_id immediately.
 
     If the run fails before any event is emitted (e.g. missing SCRAPING_REPO_ROOT,
@@ -69,7 +73,7 @@ def _kickoff_async(slack_url: str) -> str:
 
     def _worker() -> None:
         try:
-            for event in run_rca(slack_url):
+            for event in run_rca(slack_url, thread_text=thread_text, clickup_url=clickup_url):
                 if not run_id_holder:
                     run_id_holder["id"] = event.run_id
                     ready.set()
@@ -103,11 +107,15 @@ def kickoff(payload: dict[str, str]) -> dict[str, str]:
 
 
 @app.get("/rca/stream")
-async def stream(slack_url: str):
+async def stream(slack_url: str, thread_text: str | None = None, clickup_url: str | None = None):
     if not slack_url.strip():
         raise HTTPException(400, "slack_url is required")
     try:
-        run_id = _kickoff_async(slack_url.strip())
+        run_id = _kickoff_async(
+            slack_url.strip(),
+            thread_text=(thread_text or "").strip() or None,
+            clickup_url=(clickup_url or "").strip() or None,
+        )
     except Exception as e:
         logger.exception("kickoff failed before worker started")
         rid = f"err-{uuid.uuid4().hex[:8]}"
@@ -220,6 +228,7 @@ def preflight() -> JSONResponse:
         s = _s()
         info["scraping_repo_root"] = str(s.SCRAPING_REPO_ROOT) if s.SCRAPING_REPO_ROOT else None
         info["llm_model"] = s.LLM_MODEL
+        info["llm_provider"] = s.LLM_PROVIDER
 
         # SCRAPING_REPO_ROOT
         if s.SCRAPING_REPO_ROOT is None:

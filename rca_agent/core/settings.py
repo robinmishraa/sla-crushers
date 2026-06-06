@@ -11,12 +11,32 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 # sla-crushers/rca_agent/core/settings.py -> parents[2] = sla-crushers/
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-load_dotenv(PROJECT_ROOT / ".env")
+
+def _apply_dotenv_skipping_placeholders(path: Path, override: bool = False) -> None:
+    """Like load_dotenv() but never lets empty / '...'-suffix placeholder values
+    into os.environ — those would shadow real values loaded later (e.g. from
+    the scraping repo's .env). Idempotent."""
+    if not path.exists():
+        return
+    for k, v in (dotenv_values(path) or {}).items():
+        if v is None:
+            continue
+        v = v.strip()
+        if not v or v.endswith("..."):
+            continue
+        if override or k not in os.environ:
+            os.environ[k] = v
+
+
+# Module-import load: only the real values from sla-crushers/.env. Class-level
+# field declarations below need these in os.environ. The scraping repo's .env
+# is then loaded in Settings.__init__ to fill in DB_*, SF_*, AWS_*, etc.
+_apply_dotenv_skipping_placeholders(PROJECT_ROOT / ".env")
 
 
 def _get(name: str, default: str | None = None) -> str | None:
@@ -76,9 +96,44 @@ class Settings:
     SCRAPING_REPO_ROOT: Path | None = None
     SCRAPING_REPO_ROOT_RAW: str | None = _get("SCRAPING_REPO_ROOT")
 
-    # LLM
+    # LLM — we auto-detect the provider from the key prefix:
+    #   sk-or-...  → OpenRouter (OpenAI-compatible API). Set during the hackathon.
+    #   sk-ant-... → Anthropic direct.
+    # Models are namespaced differently on each, so we pick a sensible default per provider.
     ANTHROPIC_API_KEY: str | None = _get("ANTHROPIC_API_KEY")
-    LLM_MODEL: str = _get("RCA_LLM_MODEL", "claude-sonnet-4-5-20250929") or "claude-sonnet-4-5-20250929"
+    _user_model: str | None = _get("RCA_LLM_MODEL")
+
+    @property
+    def LLM_PROVIDER(self) -> str:
+        key = self.ANTHROPIC_API_KEY or ""
+        if key.startswith("sk-or-"):
+            return "openrouter"
+        return "anthropic"
+
+    @property
+    def LLM_MODEL(self) -> str:
+        provider = self.LLM_PROVIDER
+        user = self._user_model
+
+        if provider == "openrouter":
+            # If the user explicitly provided an OpenRouter-style namespaced model, honor it.
+            if user and "/" in user:
+                return user
+            # Translate common Anthropic model IDs to their OpenRouter equivalents
+            # so the same RCA_LLM_MODEL value works across providers.
+            mapping = {
+                "claude-sonnet-4-5-20250929":   "anthropic/claude-sonnet-4.5",
+                "claude-3-7-sonnet-20250219":   "anthropic/claude-3.7-sonnet",
+                "claude-3-5-sonnet-20241022":   "anthropic/claude-3.5-sonnet",
+                "claude-opus-4-20250514":       "anthropic/claude-opus-4",
+            }
+            if user and user in mapping:
+                return mapping[user]
+            # Sensible default for hackathon
+            return "anthropic/claude-sonnet-4.5"
+
+        # Anthropic direct
+        return user or "claude-sonnet-4-5-20250929"
 
     # Slack — accept SLACK_ANALYTICS_TOKEN as a fallback for SLACK_BOT_TOKEN
     # (the scraping repo's existing .env uses that name for the same xoxb token).
@@ -101,26 +156,36 @@ class Settings:
     PG_DEFAULT_LIMIT: int = _get_int("RCA_PG_DEFAULT_LIMIT", 200)
     AUTO_PR_MIN_CONFIDENCE: float = _get_float("RCA_AUTO_PR_MIN_CONFIDENCE", 0.75)
 
+    # If true, the orchestrator will NOT post the RCA back into the Slack thread —
+    # the RCA still renders in the UI. Useful when the bot lacks chat:write or
+    # when you just want a dry run. Default true for hackathon safety.
+    SKIP_SLACK_POST: bool = (_get("RCA_SKIP_SLACK_POST", "true") or "true").lower() in ("1", "true", "yes")
+
     # Persistence
     LOG_DIR: Path = Path(_get("RCA_LOG_DIR", str(PROJECT_ROOT / "runs" / "logs")))
 
     def __init__(self) -> None:
         self.SCRAPING_REPO_ROOT = _resolve_scraping_repo()
         if self.SCRAPING_REPO_ROOT is not None:
-            # Make the scraping repo importable so we can reuse:
-            #   common.config.database, temporal.resources.snowflake_client,
-            #   temporal_v2.registry, etc.
+            # Make the scraping repo importable (common.config.database,
+            # temporal.resources.snowflake_client, temporal_v2.registry, etc.)
             if str(self.SCRAPING_REPO_ROOT) not in sys.path:
                 sys.path.insert(0, str(self.SCRAPING_REPO_ROOT))
-            # Also load the scraping repo's .env so DB_*, SF_*, AWS_*, SLACK_ANALYTICS_TOKEN
-            # vars exist for tools that need them.
+            # Pull DB_*, SF_*, AWS_*, SLACK_ANALYTICS_TOKEN from the scraping repo's .env.
             load_dotenv(self.SCRAPING_REPO_ROOT / ".env")
-            # Re-load our own .env on top so project-level overrides win.
-            load_dotenv(PROJECT_ROOT / ".env", override=True)
+            # Apply our .env on top, but ONLY for values that are genuinely set —
+            # empty placeholders like "SF_RSA_KEY=" or "GITHUB_TOKEN=ghp_..." must NOT
+            # clobber real values from the scraping repo's .env.
+            for k, v in (dotenv_values(PROJECT_ROOT / ".env") or {}).items():
+                if v is None:
+                    continue
+                v = v.strip()
+                if not v or v.endswith("..."):
+                    continue
+                os.environ[k] = v
 
-        # Re-resolve any token whose value lives in the scraping repo's .env (loaded above).
-        # Class-level field declarations evaluated before __init__ ran, so SLACK_ANALYTICS_TOKEN
-        # wasn't in os.environ yet at that point.
+        # Re-resolve tokens that came from the scraping repo's .env (loaded above)
+        # — class-level field declarations evaluated before __init__ ran.
         slack_resolved = _get("SLACK_BOT_TOKEN") or _get("SLACK_ANALYTICS_TOKEN")
         if slack_resolved:
             self.SLACK_BOT_TOKEN = slack_resolved

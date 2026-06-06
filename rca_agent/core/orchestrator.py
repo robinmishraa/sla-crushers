@@ -300,20 +300,57 @@ def _extract_issue(thread: dict[str, Any], ticket: dict[str, Any] | None, slack_
 
 # ---------- Main orchestrator ----------
 
-def run_rca(slack_url: str) -> Iterator[StreamEvent]:
+def run_rca(
+    slack_url: str,
+    thread_text: str | None = None,
+    clickup_url: str | None = None,
+) -> Iterator[StreamEvent]:
+    """Drive the full RCA pipeline.
+
+    Args:
+        slack_url: The Slack permalink. Required — we need the channel/ts to post back.
+        thread_text: Optional pre-pasted thread body (use when the Slack bot lacks
+            `channels:history` / `groups:history` scopes and can't read the thread itself).
+        clickup_url: Optional explicit ClickUp URL (if not embedded in the thread text).
+    """
     audit = get_audit_logger()
     run_id = audit.start_run(slack_url)
     started_at = _now()
 
     try:
-        yield _evt("status", run_id, message="Fetching Slack thread")
-        thread_result = SlackGetThreadTool().run({"url": slack_url}, run_id=run_id)
-        if "error" in thread_result:
-            yield _evt("error", run_id, error=thread_result["error"])
-            audit.finish_run(run_id, "failed")
-            return
+        parsed = parse_slack_link(slack_url)
+        thread_result: dict[str, Any]
 
-        clickup_urls = thread_result.get("clickup_urls", [])
+        if thread_text and thread_text.strip():
+            # User pasted the thread directly — skip the Slack API call.
+            yield _evt("status", run_id, message="Using pasted thread text (skipping Slack API)")
+            from rca_agent.tools.slack_tool import extract_clickup_urls
+            embedded_clickup = extract_clickup_urls(thread_text)
+            thread_result = {
+                "channel": parsed.channel,
+                "parent_ts": parsed.parent_ts,
+                "messages": [{"user": "pasted", "ts": parsed.ts, "text": thread_text, "reactions": []}],
+                "clickup_urls": embedded_clickup,
+                "rows_count": 1,
+                "source": "pasted",
+            }
+        else:
+            yield _evt("status", run_id, message="Fetching Slack thread")
+            thread_result = SlackGetThreadTool().run({"url": slack_url}, run_id=run_id)
+            if "error" in thread_result:
+                err = thread_result["error"]
+                hint = ""
+                if "missing_scope" in str(err).lower():
+                    hint = (
+                        " — your Slack bot doesn't have channels:history / groups:history scope. "
+                        "Paste the thread text into the 'Paste thread text' box below the URL and re-run."
+                    )
+                yield _evt("error", run_id, error=str(err) + hint)
+                audit.finish_run(run_id, "failed")
+                return
+
+        # Explicit ClickUp URL overrides anything found in the thread text.
+        clickup_urls = [clickup_url] if (clickup_url and clickup_url.strip()) else thread_result.get("clickup_urls", [])
         ticket_result: dict[str, Any] | None = None
         if clickup_urls:
             yield _evt("status", run_id, message=f"Fetching ClickUp ticket {clickup_urls[0]}")
@@ -453,18 +490,30 @@ def run_rca(slack_url: str) -> Iterator[StreamEvent]:
             audit.finish_run(run_id, "failed")
             return
 
+        def _parse_list(items: list[Any], model_cls: Any, label: str) -> list[Any]:
+            """Best-effort parse: skip individual items that fail validation."""
+            out: list[Any] = []
+            for i, raw in enumerate(items or []):
+                try:
+                    out.append(model_cls(**raw))
+                except (ValidationError, TypeError) as ex:
+                    logger.warning(
+                        "submit_rca: dropping invalid {} #{} ({}): {}",
+                        label, i, ex.__class__.__name__, ex,
+                    )
+            return out
+
+        evidence    = _parse_list(rca_payload.get("evidence", []),                 Evidence,              "evidence")
+        hypotheses  = _parse_list(rca_payload.get("hypotheses", []),               Hypothesis,            "hypothesis")
+        checklist   = _parse_list(rca_payload.get("investigation_checklist", []),  ChecklistItem,         "checklist item")
+        chain       = _parse_list(rca_payload.get("chain_of_custody", []),         ChainOfCustodyHop,     "chain hop")
+        next_actions = _parse_list(rca_payload.get("next_actions", []),            NextAction,            "next action")
+        plan        = _parse_list(rca_payload.get("investigation_plan", []),       InvestigationPlanItem, "plan item")
         try:
-            evidence = [Evidence(**e) for e in rca_payload.get("evidence", [])]
-            hypotheses = [Hypothesis(**h) for h in rca_payload.get("hypotheses", [])]
-            checklist = [ChecklistItem(**c) for c in rca_payload.get("investigation_checklist", [])]
-            chain = [ChainOfCustodyHop(**h) for h in rca_payload.get("chain_of_custody", [])]
-            fix = FixProposal(**rca_payload.get("fix") or {})
-            next_actions = [NextAction(**a) for a in rca_payload.get("next_actions", [])]
-            plan = [InvestigationPlanItem(**p) for p in rca_payload.get("investigation_plan", [])]
-        except ValidationError as e:
-            yield _evt("error", run_id, error=f"submit_rca payload invalid: {e}")
-            audit.finish_run(run_id, "failed")
-            return
+            fix = FixProposal(**(rca_payload.get("fix") or {}))
+        except (ValidationError, TypeError) as e:
+            logger.warning("submit_rca: invalid fix proposal, defaulting to NONE: {}", e)
+            fix = FixProposal()
 
         # Verdict — fall back to inconclusive if the LLM forgets it
         verdict_raw = rca_payload.get("verdict_kind") or VerdictKind.INCONCLUSIVE.value
@@ -531,7 +580,9 @@ def run_rca(slack_url: str) -> Iterator[StreamEvent]:
                 yield _evt("status", run_id, message=f"Could not open PR: {pr_result.get('error')}")
 
         # ---- post the RCA back into the Slack thread ----
-        if (
+        if settings().SKIP_SLACK_POST:
+            yield _evt("status", run_id, message="Skipping Slack post-back (RCA_SKIP_SLACK_POST=true)")
+        elif (
             settings().SLACK_BOT_TOKEN
             and issue.slack_channel
             and issue.slack_thread_ts
